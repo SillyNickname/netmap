@@ -1,0 +1,11 @@
+name,ip_address,location,parent,grouping,group_mode,description
+Core-Router-HQ,127.0.0.1,HQ Datacenter,,,any,Main Gateway
+Dist-Switch-1,127.0.0.1,HQ Datacenter,Core-Router-HQ,,,Distribution Switch 1
+Dist-Switch-2,127.0.0.1,HQ Datacenter,Core-Router-HQ,,,Distribution Switch 2
+Web-Node-01,127.0.0.1,HQ Datacenter,Dist-Switch-1,Web-Cluster,any,Primary web frontend
+Web-Node-02,127.0.0.1,HQ Datacenter,Dist-Switch-1,Web-Cluster,any,Secondary web frontend
+DB-Primary,127.0.0.1,HQ Datacenter,Dist-Switch-2,DB-Cluster,all,Database Primary
+DB-Replica,127.0.0.1,HQ Datacenter,Dist-Switch-2,DB-Cluster,all,Database Replica
+Edge-Router-NY,127.0.0.1,New York Branch,,,any,Branch Gateway
+NY-Switch-1,127.0.0.1,New York Branch,Edge-Router-NY,,,Branch Switch
+NY-FileServer,127.0.0.1,New York Branch,NY-Switch-1,,,Branch Storage

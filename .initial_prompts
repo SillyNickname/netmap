@@ -1,0 +1,21 @@
+ Today we're building a project on Python that will poll, with parallel pings (user defined number of threads), various IPs and make a compact tree-like structure show if they're up or down.
+  The main program will have a web interface but will also poll, from time to time (user defined) the various hosts but will allow a user, from the web interface, to force a poll on request.
+  This interface is publicly accessible but only logged in users will be able to force a poll.
+
+  The various hosts will be stored in a database (in sqlite) with their Name, Grouping (where one or more hosts will be polled but their response will be considered as a single up or down
+  state), Hierarchy (used to build the tree-like structure where this field will contain the name or ID of the parent host) and Location (a macro hierarchy that will be used to keep track of
+  servers in different geographical locations). There will be an interface to allow the editing of this database, this will be part of a password protected part of the software only accessed
+  by users with administrative permissions. This interface will allow for a CSV file to be used to initially load the hosts into the database.
+
+  Another database (also in sqlite) will store at least 24h of history per host (user-defined upper limit) and, when clicked on in the main tree-like structure, it will show a timelime of
+  up/down states of the select host. In the main tree-like structure there will be an abbreviated graph showing the up/down stats of the past half hour.
+
+  The software will be optimized and as secure as possible to save resources but allow an expanding database.
+
+  The code will be properly formated and all variables (such as auto-polling time, TCP port and other information deemed important) will be able to be changed within the administrative
+  interface or through an external .cfg file.
+
+  The interface should be visually simple to allow at-a-glance information of up/down states acroos the whole network and/or Locations. Consider that the site should be optimized for
+  widescreen monitors (720p or 1080p) so a left-to-right format should be prefered to a top-down format.
+
+  Need anything else?

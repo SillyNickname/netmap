@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetMap - Network Tree Status Monitor</title>
+    <link rel="stylesheet" href="/static/css/netmap.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="navbar">
+        <a href="/" class="brand">
+            <div class="brand-icon">🌐</div>
+            <span>NetMap</span>
+        </a>
+
+        <!-- Global At-A-Glance Status Bar -->
+        <div class="nav-stats">
+            <div class="stat-item">
+                <span class="stat-muted">Total:</span>
+                <span id="stat-total" class="stat-val">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-up">● UP:</span>
+                <span id="stat-up" class="stat-val stat-up">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-down">● DOWN:</span>
+                <span id="stat-down" class="stat-val stat-down">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-muted">Uptime:</span>
+                <span id="stat-uptime" class="stat-val">100%</span>
+            </div>
+        </div>
+
+        <div class="nav-actions">
+            <!-- Force Poll Button (Restricted to logged-in users) -->
+            <button id="btn-force-poll" class="btn btn-primary" title="Log in to trigger an on-demand poll">
+                <span>⚡ Force Poll</span>
+            </button>
+            <div id="nav-auth-container" style="display: flex; align-items: center; gap: 8px;">
+                <!-- Populated dynamically by app.js -->
+            </div>
+        </div>
+    </header>
+
+    <!-- Toolbar & Location Filter -->
+    <div class="toolbar">
+        <div class="filter-group">
+            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">LOCATIONS:</span>
+            <div id="location-tabs" class="pill-tabs">
+                <button class="pill-tab active" onclick="filterLocation('all')">All Sites</button>
+            </div>
+        </div>
+        <div class="status-summary">
+            <div>Last Polled: <strong id="last-poll-time" style="color: #fff;">—</strong></div>
+            <div>Next Poll: <strong id="next-poll-countdown" style="color: var(--accent-color);">—</strong></div>
+            <button onclick="refreshData()" class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;">↻ Refresh</button>
+        </div>
+    </div>
+
+    <!-- Main Left-to-Right Widescreen Tree View -->
+    <main class="container">
+        <div id="tree-root-container">
+            <div style="text-align: center; padding: 60px 20px; color: var(--text-dim);">
+                <div class="spinner"></div>
+                <div style="margin-top: 10px;">Loading network hierarchy...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Host 24h Timeline Modal -->
+    <div id="timeline-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.25rem;">📊</span>
+                    <h3 class="modal-title" id="timeline-host-title">Host Timeline</h3>
+                </div>
+                <button class="modal-close" onclick="closeTimelineModal()">&times;</button>
+            </div>
+            <div id="timeline-modal-content" class="modal-body">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Sign In Modal -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Sign In to NetMap</h3>
+                <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+            </div>
+            <form id="login-form" class="modal-body" style="padding-top: 16px;">
+                <div id="login-error" style="color: var(--down-color); font-size: 0.85rem; min-height: 18px;"></div>
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" id="login-username" class="form-control" required placeholder="admin or operator">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="login-password" class="form-control" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 8px;">
+                    Sign In
+                </button>
+                <div style="font-size: 0.75rem; color: var(--text-dim); text-align: center; margin-top: 10px;">
+                    Default accounts: <code>admin / admin123</code> or <code>operator / operator123</code>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

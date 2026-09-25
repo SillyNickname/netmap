@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetMap - Administration</title>
+    <link rel="stylesheet" href="/static/css/netmap.css">
+    <style>
+        .admin-nav {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
+            background: var(--bg-subtle);
+        }
+        .admin-tab-btn {
+            padding: 12px 18px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .admin-tab-btn:hover { color: #fff; }
+        .admin-tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+        .admin-tab-panel {
+            display: none;
+        }
+        .admin-tab-panel.active {
+            display: block;
+        }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-top: 12px;
+        }
+        .admin-table th, .admin-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+        .admin-table th {
+            color: var(--text-dim);
+            font-weight: 600;
+            background: rgba(0,0,0,0.15);
+        }
+        .admin-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .panel-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 20px 24px;
+            margin-bottom: 24px;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 800px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="navbar">
+        <a href="/" class="brand">
+            <div class="brand-icon">🌐</div>
+            <span>NetMap</span>
+            <span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Admin</span>
+        </a>
+
+        <div class="nav-actions">
+            <a href="/" class="btn btn-outline" style="padding: 5px 12px;">← Back to Tree View</a>
+            <span style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                👤 <span id="admin-user-display">Admin</span>
+            </span>
+            <a href="/" onclick="fetch('/api/auth/logout', {method:'POST'});" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;">Logout</a>
+        </div>
+    </header>
+
+    <!-- Admin Navigation Tabs -->
+    <nav class="admin-nav">
+        <button class="admin-tab-btn active" data-tab="tab-hosts">🖥️ Hosts</button>
+        <button class="admin-tab-btn" data-tab="tab-groups">👥 Groups</button>
+        <button class="admin-tab-btn" data-tab="tab-csv">📂 CSV Import / Export</button>
+        <button class="admin-tab-btn" data-tab="tab-settings">⚙️ Settings (.cfg)</button>
+        <button class="admin-tab-btn" data-tab="tab-users">👤 Users</button>
+        <button class="admin-tab-btn" data-tab="tab-maintenance">🛠️ Maintenance</button>
+    </nav>
+
+    <main class="container">
+        <!-- TAB 1: HOSTS -->
+        <section id="tab-hosts" class="admin-tab-panel active">
+            <div class="panel-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div>
+                        <h2 style="font-size: 1.2rem; color: #fff;">Network Hosts & Hierarchy</h2>
+                        <p style="font-size: 0.82rem; color: var(--text-dim);">Manage host IPs, locations, and parent-child tree hierarchy.</p>
+                    </div>
+                    <button onclick="openAddHostModal()" class="btn btn-primary">+ Add New Host</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Host Name</th>
+                                <th>IP / Target</th>
+                                <th>Location (Macro)</th>
+                                <th>Parent Host (Hierarchy)</th>
+                                <th>Grouping</th>
+                                <th>Status</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hosts-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: GROUPS -->
+        <section id="tab-groups" class="admin-tab-panel">
+            <div class="panel-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div>
+                        <h2 style="font-size: 1.2rem; color: #fff;">Host Groupings</h2>
+                        <p style="font-size: 0.82rem; color: var(--text-dim);">Aggregate multiple host responses into a single combined up/down state.</p>
+                    </div>
+                    <button onclick="openAddGroupModal()" class="btn btn-primary">+ Add Group</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Group Name</th>
+                                <th>Aggregation Mode</th>
+                                <th>Assigned Hosts</th>
+                                <th>Description</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="groups-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: CSV IMPORT / EXPORT -->
+        <section id="tab-csv" class="admin-tab-panel">
+            <div class="grid-2">
+                <div class="panel-card">
+                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">📥 Bulk Import from CSV</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;">
+                        Upload a CSV file containing your network inventory. Parent devices and groups will be automatically resolved.
+                    </p>
+                    <form id="csv-import-form" onsubmit="handleCsvUpload(event)">
+                        <div class="form-group">
+                            <label class="form-label">Select CSV File</label>
+                            <input type="file" id="csv-file-input" class="form-control" accept=".csv,text/csv">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Or Paste CSV Content Directly</label>
+                            <textarea id="csv-raw-text" class="form-control" rows="8" placeholder="name,ip_address,location,parent,grouping,group_mode,description&#10;Core-Router,192.168.1.1,HQ,,,any,Gateway"></textarea>
+                        </div>
+                        <button type="submit" id="btn-csv-import" class="btn btn-primary" style="margin-top: 8px;">
+                            🚀 Upload & Import Hosts
+                        </button>
+                    </form>
+                </div>
+
+                <div class="panel-card">
+                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">📤 Export & Templates</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;">
+                        Download templates or export current database contents.
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div style="background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                            <h4 style="color: #fff; font-size: 0.95rem; margin-bottom: 4px;">Download CSV Template</h4>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
+                                Pre-formatted CSV sample file with proper headers, hierarchy, and groups.
+                            </p>
+                            <a href="/api/admin/csv/template" download="netmap_template.csv" class="btn btn-outline">
+                                📄 Download Template CSV
+                            </a>
+                        </div>
+                        <div style="background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                            <h4 style="color: #fff; font-size: 0.95rem; margin-bottom: 4px;">Export Database to CSV</h4>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
+                                Export all currently configured hosts, groups, and hierarchy relationships.
+                            </p>
+                            <a href="/api/admin/csv/export" download="netmap_hosts.csv" class="btn btn-outline">
+                                💾 Export Current Hosts CSV
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: SETTINGS (.cfg) -->
+        <section id="tab-settings" class="admin-tab-panel">
+            <div class="panel-card" style="max-width: 680px;">
+                <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">System Configuration</h2>
+                <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 20px;">
+                    Changes are automatically written to <code>netmap.cfg</code> and applied immediately to the background engine.
+                </p>
+                <form id="settings-form" onsubmit="handleSettingsSubmit(event)">
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Auto-Polling Interval (Seconds)</label>
+                            <input type="number" id="set-interval" class="form-control" min="5" max="86400" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Parallel Ping Threads / Workers</label>
+                            <input type="number" id="set-threads" class="form-control" min="1" max="500" required>
+                        </div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Ping Timeout (Seconds)</label>
+                            <input type="number" id="set-timeout" class="form-control" min="1" max="10" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Ping Count (Packets per Host)</label>
+                            <input type="number" id="set-count" class="form-control" min="1" max="5" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">History Retention (Hours, min 24h)</label>
+                        <input type="number" id="set-retention" class="form-control" min="24" max="8760" required>
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Server Bind Address</label>
+                            <input type="text" id="set-host" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Server TCP Port</label>
+                            <input type="number" id="set-port" class="form-control" min="1" max="65535" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top: 12px;">
+                        💾 Save Configuration to netmap.cfg
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- TAB 5: USERS -->
+        <section id="tab-users" class="admin-tab-panel">
+            <div class="grid-2">
+                <div class="panel-card">
+                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">Manage Users</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;">
+                        Admin: full configuration and database access.<br>
+                        Operator: can force poll from the public dashboard.
+                    </p>
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Created</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel-card">
+                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">Create User Account</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;">
+                        Add a new administrator or operator.
+                    </p>
+                    <form id="user-create-form" onsubmit="handleUserCreate(event)">
+                        <div class="form-group">
+                            <label class="form-label">Username</label>
+                            <input type="text" id="new-user-name" class="form-control" required placeholder="jdoe">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Password</label>
+                            <input type="password" id="new-user-pass" class="form-control" required placeholder="••••••••">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Role</label>
+                            <select id="new-user-role" class="form-control">
+                                <option value="operator">Operator (Can trigger force poll)</option>
+                                <option value="admin">Administrator (Full Access)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-top: 8px;">
+                            + Create Account
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 6: MAINTENANCE -->
+        <section id="tab-maintenance" class="admin-tab-panel">
+            <div class="panel-card" style="max-width: 700px;">
+                <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">Dual Database Health & Storage</h2>
+                <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 20px;">
+                    Monitor <code>hosts.db</code> (inventory) and <code>history.db</code> (time-series status).
+                </p>
+                <div class="grid-2" style="margin-bottom: 20px;">
+                    <div style="background: var(--bg-subtle); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">HOSTS DATABASE</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #fff;" id="stat-db-hosts">—</div>
+                        <div style="font-size: 0.75rem; color: var(--text-dim);">Size: <span id="stat-db-hosts-size">—</span></div>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">HISTORY DATABASE</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #fff;" id="stat-db-history">—</div>
+                        <div style="font-size: 0.75rem; color: var(--text-dim);">Indexed time-series records</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <button onclick="triggerManualPrune()" class="btn btn-outline">
+                        🧹 Run Retention Prune Now
+                    </button>
+                    <button onclick="loadStats()" class="btn btn-outline">
+                        ↻ Refresh Stats
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Add/Edit Host -->
+    <div id="host-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title" id="host-modal-title">Host Details</h3>
+                <button class="modal-close" onclick="closeHostModal()">&times;</button>
+            </div>
+            <form id="host-form" class="modal-body" onsubmit="handleHostSubmit(event)">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Host Name *</label>
+                        <input type="text" id="host-form-name" class="form-control" required placeholder="e.g. Core-Router-01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">IP Address or Hostname *</label>
+                        <input type="text" id="host-form-ip" class="form-control" required placeholder="e.g. 192.168.1.1">
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Location (Macro Hierarchy) *</label>
+                        <input type="text" id="host-form-location" class="form-control" required placeholder="e.g. HQ Datacenter">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Parent Device (Tree Hierarchy)</label>
+                        <select id="host-form-parent" class="form-control">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Grouping (Optional)</label>
+                        <select id="host-form-group" class="form-control">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; padding-top: 24px;">
+                        <input type="checkbox" id="host-form-active" style="width: 18px; height: 18px;">
+                        <label for="host-form-active" class="form-label" style="margin-bottom: 0; cursor: pointer;">Enable Polling (Active)</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description / Notes</label>
+                    <input type="text" id="host-form-desc" class="form-control" placeholder="Primary uplink router">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn btn-outline" onclick="closeHostModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Host</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add/Edit Group -->
+    <div id="group-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="group-modal-title">Group Details</h3>
+                <button class="modal-close" onclick="closeGroupModal()">&times;</button>
+            </div>
+            <form id="group-form" class="modal-body" onsubmit="handleGroupSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label">Group Name *</label>
+                    <input type="text" id="group-form-name" class="form-control" required placeholder="e.g. Web-Cluster">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Aggregation Mode *</label>
+                    <select id="group-form-mode" class="form-control" required>
+                        <option value="any">Any Host UP = Group UP (Redundancy / HA)</option>
+                        <option value="all">All Hosts UP = Group UP (Strict Cluster Health)</option>
+                    </select>
+                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
+                        "Any Up" is ideal for load-balanced or redundant clusters where 1 working node keeps service up.
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" id="group-form-desc" class="form-control" placeholder="Production web tier">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn btn-outline" onclick="closeGroupModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>
