@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetMap - Network Tree Status Monitor</title>
+    <title>NetMap - Monitoramento de Topologia de Rede</title>
     <link rel="stylesheet" href="/static/css/netmap.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌐</text></svg>">
 </head>
-<body>
+<body class="density-compact">
 
     <!-- Header Navigation -->
     <header class="navbar">
@@ -19,27 +19,33 @@
         <!-- Global At-A-Glance Status Bar -->
         <div class="nav-stats">
             <div class="stat-item">
-                <span class="stat-muted">Total:</span>
+                <span class="stat-muted" data-i18n="stat_total">Total:</span>
                 <span id="stat-total" class="stat-val">0</span>
             </div>
             <div class="stat-item">
-                <span class="stat-up">● UP:</span>
+                <span class="stat-up" data-i18n="stat_up">● ONLINE:</span>
                 <span id="stat-up" class="stat-val stat-up">0</span>
             </div>
             <div class="stat-item">
-                <span class="stat-down">● DOWN:</span>
+                <span class="stat-down" data-i18n="stat_down">● OFFLINE:</span>
                 <span id="stat-down" class="stat-val stat-down">0</span>
             </div>
             <div class="stat-item">
-                <span class="stat-muted">Uptime:</span>
+                <span class="stat-muted" data-i18n="stat_uptime">Disponibilidade:</span>
                 <span id="stat-uptime" class="stat-val">100%</span>
             </div>
         </div>
 
         <div class="nav-actions">
+            <!-- Language Switcher (PT-BR default) -->
+            <div class="lang-switcher">
+                <button id="lang-btn-pt" class="lang-btn active" onclick="setLanguage('pt-BR')">🇧🇷 PT</button>
+                <button id="lang-btn-en" class="lang-btn" onclick="setLanguage('en')">🇺🇸 EN</button>
+            </div>
+
             <!-- Force Poll Button (Restricted to logged-in users) -->
-            <button id="btn-force-poll" class="btn btn-primary" title="Log in to trigger an on-demand poll">
-                <span>⚡ Force Poll</span>
+            <button id="btn-force-poll" class="btn btn-primary" data-i18n-title="auth_required_poll" title="Faça login para forçar uma sondagem">
+                <span data-i18n="btn_force_poll">⚡ Forçar Sondagem</span>
             </button>
             <div id="nav-auth-container" style="display: flex; align-items: center; gap: 8px;">
                 <!-- Populated dynamically by app.js -->
@@ -47,18 +53,30 @@
         </div>
     </header>
 
-    <!-- Toolbar & Location Filter -->
+    <!-- Toolbar: Location Filter & View Density Option -->
     <div class="toolbar">
         <div class="filter-group">
-            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">LOCATIONS:</span>
+            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);" data-i18n="label_locations">LOCAIS:</span>
             <div id="location-tabs" class="pill-tabs">
-                <button class="pill-tab active" onclick="filterLocation('all')">All Sites</button>
+                <button class="pill-tab active" onclick="filterLocation('all')" data-i18n="all_sites">Todos os Locais</button>
             </div>
         </div>
-        <div class="status-summary">
-            <div>Last Polled: <strong id="last-poll-time" style="color: #fff;">—</strong></div>
-            <div>Next Poll: <strong id="next-poll-countdown" style="color: var(--accent-color);">—</strong></div>
-            <button onclick="refreshData()" class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;">↻ Refresh</button>
+
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <!-- Box Density Switcher: Compact (20px) vs Tall (Comfortable) -->
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;" data-i18n="density_label">Modo:</span>
+                <div class="pill-tabs">
+                    <button id="density-btn-compact" class="pill-tab active" onclick="setDensity('compact')" data-i18n="density_compact">Compacto (20px)</button>
+                    <button id="density-btn-tall" class="pill-tab" onclick="setDensity('tall')" data-i18n="density_tall">Expandido</button>
+                </div>
+            </div>
+
+            <div class="status-summary">
+                <div><span data-i18n="last_polled">Última Sondagem:</span> <strong id="last-poll-time" style="color: #fff;">—</strong></div>
+                <div><span data-i18n="next_poll">Próxima Sondagem:</span> <strong id="next-poll-countdown" style="color: var(--accent-color);">—</strong></div>
+                <button onclick="refreshData()" class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" data-i18n="btn_refresh">↻ Atualizar</button>
+            </div>
         </div>
     </div>
 
@@ -67,7 +85,7 @@
         <div id="tree-root-container">
             <div style="text-align: center; padding: 60px 20px; color: var(--text-dim);">
                 <div class="spinner"></div>
-                <div style="margin-top: 10px;">Loading network hierarchy...</div>
+                <div style="margin-top: 10px;" data-i18n="loading_hierarchy">Carregando topologia da rede...</div>
             </div>
         </div>
     </main>
@@ -78,7 +96,7 @@
             <div class="modal-header">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 1.25rem;">📊</span>
-                    <h3 class="modal-title" id="timeline-host-title">Host Timeline</h3>
+                    <h3 class="modal-title" id="timeline-host-title" data-i18n="modal_timeline_title">Histórico do Dispositivo</h3>
                 </div>
                 <button class="modal-close" onclick="closeTimelineModal()">&times;</button>
             </div>
@@ -92,24 +110,24 @@
     <div id="login-modal" class="modal-overlay">
         <div class="modal-card" style="max-width: 400px;">
             <div class="modal-header">
-                <h3 class="modal-title">Sign In to NetMap</h3>
+                <h3 class="modal-title" data-i18n="login_modal_title">Acessar o NetMap</h3>
                 <button class="modal-close" onclick="closeLoginModal()">&times;</button>
             </div>
             <form id="login-form" class="modal-body" style="padding-top: 16px;">
                 <div id="login-error" style="color: var(--down-color); font-size: 0.85rem; min-height: 18px;"></div>
                 <div class="form-group">
-                    <label class="form-label">Username</label>
-                    <input type="text" id="login-username" class="form-control" required placeholder="admin or operator">
+                    <label class="form-label" data-i18n="username_label">Nome de Usuário</label>
+                    <input type="text" id="login-username" class="form-control" required placeholder="admin ou operator">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Password</label>
+                    <label class="form-label" data-i18n="password_label">Senha</label>
                     <input type="password" id="login-password" class="form-control" required placeholder="••••••••">
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 8px;">
-                    Sign In
+                    <span data-i18n="login_btn_submit">Entrar no Sistema</span>
                 </button>
-                <div style="font-size: 0.75rem; color: var(--text-dim); text-align: center; margin-top: 10px;">
-                    Default accounts: <code>admin / admin123</code> or <code>operator / operator123</code>
+                <div style="font-size: 0.75rem; color: var(--text-dim); text-align: center; margin-top: 10px;" data-i18n="default_accounts_hint">
+                    Contas padrão: <code>admin / admin123</code> ou <code>operator / operator123</code>
                 </div>
             </form>
         </div>
@@ -118,6 +136,7 @@
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
 
+    <script src="/static/js/i18n.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

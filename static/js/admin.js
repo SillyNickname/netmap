@@ -68,7 +68,7 @@ function renderHostsTable() {
     if (!tbody) return;
 
     if (currentHosts.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 24px;">No hosts found. Add one or import via CSV.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 24px;">${t("no_hosts_title")}</td></tr>`;
         return;
     }
 
@@ -77,12 +77,12 @@ function renderHostsTable() {
             <td><strong>${escapeHtml(h.name)}</strong></td>
             <td><code>${escapeHtml(h.ip_address)}</code></td>
             <td>${escapeHtml(h.location)}</td>
-            <td>${h.parent_name ? escapeHtml(h.parent_name) : '<span style="color: var(--text-dim);">Root</span>'}</td>
+            <td>${h.parent_name ? escapeHtml(h.parent_name) : `<span style="color: var(--text-dim);">${t("root_device")}</span>`}</td>
             <td>${h.grouping ? `<span class="group-badge">${escapeHtml(h.grouping)} (${h.group_mode || 'any'})</span>` : '—'}</td>
-            <td>${h.is_active ? '<span style="color: var(--up-color);">Active</span>' : '<span style="color: var(--down-color);">Disabled</span>'}</td>
+            <td>${h.is_active ? `<span style="color: var(--up-color);">${t("active_status")}</span>` : `<span style="color: var(--down-color);">${t("disabled_status")}</span>`}</td>
             <td style="text-align: right;">
-                <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openEditHostModal(${h.id})">Edit</button>
-                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteHost(${h.id}, '${escapeHtml(h.name)}')">Delete</button>
+                <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openEditHostModal(${h.id})">${t("btn_edit")}</button>
+                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteHost(${h.id}, '${escapeHtml(h.name)}')">${t("btn_delete")}</button>
             </td>
         </tr>
     `).join("");
@@ -91,7 +91,7 @@ function renderHostsTable() {
 function populateParentDropdowns() {
     const sel = document.getElementById("host-form-parent");
     if (!sel) return;
-    sel.innerHTML = `<option value="">-- None (Root Device) --</option>` + 
+    sel.innerHTML = `<option value="">${t("field_parent_none")}</option>` + 
         currentHosts
             .filter(h => !editingHostId || h.id !== editingHostId)
             .map(h => `<option value="${h.id}">${escapeHtml(h.name)} (${escapeHtml(h.location)} - ${h.ip_address})</option>`)
@@ -101,13 +101,13 @@ function populateParentDropdowns() {
 function populateGroupDropdown() {
     const sel = document.getElementById("host-form-group");
     if (!sel) return;
-    sel.innerHTML = `<option value="">-- Standalone (No Group) --</option>` + 
+    sel.innerHTML = `<option value="">${t("field_group_none")}</option>` + 
         currentGroups.map(g => `<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)} (${g.aggregation_mode})</option>`).join("");
 }
 
 function openAddHostModal() {
     editingHostId = null;
-    document.getElementById("host-modal-title").innerText = "Add New Host";
+    document.getElementById("host-modal-title").innerText = t("modal_add_host_title");
     document.getElementById("host-form").reset();
     document.getElementById("host-form-active").checked = true;
     populateParentDropdowns();
@@ -120,7 +120,7 @@ function openEditHostModal(hostId) {
     if (!host) return;
 
     editingHostId = hostId;
-    document.getElementById("host-modal-title").innerText = "Edit Host";
+    document.getElementById("host-modal-title").innerText = t("modal_edit_host_title");
     populateParentDropdowns();
     populateGroupDropdown();
 
@@ -183,7 +183,7 @@ async function handleHostSubmit(e) {
 }
 
 async function deleteHost(id, name) {
-    if (!confirm(`Are you sure you want to delete host '${name}'? This cannot be undone.`)) {
+    if (!confirm(`${t("confirm_delete_host")} '${name}'?`)) {
         return;
     }
     try {
@@ -228,21 +228,21 @@ function renderGroupsTable() {
             <td><strong>${escapeHtml(g.name)}</strong></td>
             <td>
                 <span class="group-badge" style="font-size: 0.8rem;">
-                    ${g.aggregation_mode === 'any' ? 'Any Up (Redundant/Failover)' : 'All Up (Strict Cluster)'}
+                    ${g.aggregation_mode === 'any' ? t("mode_any") : t("mode_all")}
                 </span>
             </td>
-            <td>${g.host_count} hosts assigned</td>
+            <td>${g.host_count} ${t("hosts_count_suffix")}</td>
             <td>${escapeHtml(g.description || '—')}</td>
             <td style="text-align: right;">
-                <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openEditGroupModal('${escapeHtml(g.name)}')">Edit</button>
-                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteGroup('${escapeHtml(g.name)}')">Delete</button>
+                <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openEditGroupModal('${escapeHtml(g.name)}')">${t("btn_edit")}</button>
+                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteGroup('${escapeHtml(g.name)}')">${t("btn_delete")}</button>
             </td>
         </tr>
     `).join("");
 }
 
 function openAddGroupModal() {
-    document.getElementById("group-modal-title").innerText = "Add New Group";
+    document.getElementById("group-modal-title").innerText = t("modal_add_group_title");
     document.getElementById("group-form").reset();
     document.getElementById("group-form-name").removeAttribute("readonly");
     document.getElementById("group-modal").classList.add("active");
@@ -252,7 +252,7 @@ function openEditGroupModal(groupName) {
     const grp = currentGroups.find(g => g.name === groupName);
     if (!grp) return;
 
-    document.getElementById("group-modal-title").innerText = "Edit Group";
+    document.getElementById("group-modal-title").innerText = t("modal_edit_group_title");
     document.getElementById("group-form-name").value = grp.name;
     document.getElementById("group-form-name").setAttribute("readonly", "true");
     document.getElementById("group-form-mode").value = grp.aggregation_mode;
@@ -305,7 +305,7 @@ async function handleGroupSubmit(e) {
 }
 
 async function deleteGroup(name) {
-    if (!confirm(`Are you sure you want to delete group '${name}'? Hosts in this group will become standalone.`)) {
+    if (!confirm(t("confirm_delete_group"))) {
         return;
     }
     try {
@@ -362,7 +362,7 @@ async function handleSettingsSubmit(e) {
         });
         const data = await res.json();
         if (res.ok && data.success) {
-            showToast("Settings successfully saved to netmap.cfg and live engine!", "success");
+            showToast(t("settings_saved_success"), "success");
         } else {
             showToast(data.detail || "Failed to update settings", "error");
         }
@@ -446,7 +446,7 @@ function renderUsersTable() {
             </td>
             <td>${new Date(u.created_at).toLocaleDateString()}</td>
             <td style="text-align: right;">
-                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteUser(${u.id}, '${escapeHtml(u.username)}')">Delete</button>
+                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteUser(${u.id}, '${escapeHtml(u.username)}')">${t("btn_delete")}</button>
             </td>
         </tr>
     `).join("");
@@ -478,7 +478,7 @@ async function handleUserCreate(e) {
 }
 
 async function deleteUser(id, username) {
-    if (!confirm(`Are you sure you want to delete user '${username}'?`)) return;
+    if (!confirm(`${t("confirm_delete_user")} '${username}'?`)) return;
     try {
         const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
         const data = await res.json();
@@ -500,8 +500,8 @@ async function loadStats() {
         const res = await fetch("/api/admin/maintenance/stats");
         const data = await res.json();
 
-        document.getElementById("stat-db-hosts").innerText = `${data.hosts_count} hosts`;
-        document.getElementById("stat-db-history").innerText = `${data.history_rows_count.toLocaleString()} rows (${data.history_db_size_mb} MB)`;
+        document.getElementById("stat-db-hosts").innerText = `${data.hosts_count} ${t("hosts_count_suffix")}`;
+        document.getElementById("stat-db-history").innerText = `${data.history_rows_count.toLocaleString()} ${t("db_records_label")} (${data.history_db_size_mb} MB)`;
         document.getElementById("stat-db-hosts-size").innerText = `${data.hosts_db_size_mb} MB`;
     } catch (err) {
         console.error("Failed to load maintenance stats:", err);

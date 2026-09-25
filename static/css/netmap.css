@@ -440,6 +440,109 @@ body {
   opacity: 0.75;
 }
 
+/* ============================================================
+   TALL / COMFORTABLE DENSITY OPTION
+   ============================================================ */
+.density-tall .tree-container {
+  gap: 12px;
+}
+
+.density-tall .tree-row {
+  margin-bottom: 6px;
+}
+
+.density-tall .tree-children {
+  gap: 8px;
+  margin-left: 28px;
+  padding-left: 16px;
+}
+
+.density-tall .tree-children::before {
+  top: 24px;
+  left: -16px;
+  width: 16px;
+}
+
+.density-tall .host-card {
+  height: 48px;
+  max-height: 48px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 260px;
+}
+
+.density-tall .card-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.density-tall .card-row-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.density-tall .host-name {
+  font-size: 12px;
+  max-width: 160px;
+}
+
+.density-tall .ip-badge {
+  font-size: 11px;
+}
+
+.density-tall .sparkline-bar {
+  height: 10px;
+  width: 80px;
+  min-width: 80px;
+}
+
+.density-tall .spark-dot {
+  height: 8px;
+}
+
+/* Language & View Density Controls */
+.lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-card);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.lang-btn {
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  border: none;
+  background: transparent;
+  transition: all 0.15s ease;
+}
+
+.lang-btn:hover {
+  color: #fff;
+}
+
+.lang-btn.active {
+  background: var(--accent-color);
+  color: #fff;
+}
+
 /* Modals */
 .modal-overlay {
   position: fixed;

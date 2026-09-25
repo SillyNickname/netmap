@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetMap - Administration</title>
+    <title>NetMap - Administração</title>
     <link rel="stylesheet" href="/static/css/netmap.css">
     <style>
         .admin-nav {
@@ -78,26 +78,32 @@
         <a href="/" class="brand">
             <div class="brand-icon">🌐</div>
             <span>NetMap</span>
-            <span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Admin</span>
+            <span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-weight: 600;" data-i18n="brand_subtitle">Admin</span>
         </a>
 
         <div class="nav-actions">
-            <a href="/" class="btn btn-outline" style="padding: 5px 12px;">← Back to Tree View</a>
+            <!-- Language Switcher (PT-BR default) -->
+            <div class="lang-switcher">
+                <button id="lang-btn-pt" class="lang-btn active" onclick="setLanguage('pt-BR')">🇧🇷 PT</button>
+                <button id="lang-btn-en" class="lang-btn" onclick="setLanguage('en')">🇺🇸 EN</button>
+            </div>
+
+            <a href="/" class="btn btn-outline" style="padding: 5px 12px;" data-i18n="back_to_tree">← Voltar ao Mapa</a>
             <span style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
                 👤 <span id="admin-user-display">Admin</span>
             </span>
-            <a href="/" onclick="fetch('/api/auth/logout', {method:'POST'});" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;">Logout</a>
+            <a href="/" onclick="fetch('/api/auth/logout', {method:'POST'});" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" data-i18n="btn_logout">Sair</a>
         </div>
     </header>
 
     <!-- Admin Navigation Tabs -->
     <nav class="admin-nav">
-        <button class="admin-tab-btn active" data-tab="tab-hosts">🖥️ Hosts</button>
-        <button class="admin-tab-btn" data-tab="tab-groups">👥 Groups</button>
-        <button class="admin-tab-btn" data-tab="tab-csv">📂 CSV Import / Export</button>
-        <button class="admin-tab-btn" data-tab="tab-settings">⚙️ Settings (.cfg)</button>
-        <button class="admin-tab-btn" data-tab="tab-users">👤 Users</button>
-        <button class="admin-tab-btn" data-tab="tab-maintenance">🛠️ Maintenance</button>
+        <button class="admin-tab-btn active" data-tab="tab-hosts" data-i18n="tab_hosts">🖥️ Dispositivos</button>
+        <button class="admin-tab-btn" data-tab="tab-groups" data-i18n="tab_groups">👥 Grupos</button>
+        <button class="admin-tab-btn" data-tab="tab-csv" data-i18n="tab_csv">📂 Importar / Exportar CSV</button>
+        <button class="admin-tab-btn" data-tab="tab-settings" data-i18n="tab_settings">⚙️ Configurações (.cfg)</button>
+        <button class="admin-tab-btn" data-tab="tab-users" data-i18n="tab_users">👤 Usuários</button>
+        <button class="admin-tab-btn" data-tab="tab-maintenance" data-i18n="tab_maintenance">🛠️ Manutenção</button>
     </nav>
 
     <main class="container">
@@ -106,22 +112,22 @@
             <div class="panel-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <div>
-                        <h2 style="font-size: 1.2rem; color: #fff;">Network Hosts & Hierarchy</h2>
-                        <p style="font-size: 0.82rem; color: var(--text-dim);">Manage host IPs, locations, and parent-child tree hierarchy.</p>
+                        <h2 style="font-size: 1.2rem; color: #fff;" data-i18n="admin_hosts_title">Dispositivos de Rede & Topologia</h2>
+                        <p style="font-size: 0.82rem; color: var(--text-dim);" data-i18n="admin_hosts_desc">Gerencie IPs, locais geográficos e a hierarquia pai-filho da topologia.</p>
                     </div>
-                    <button onclick="openAddHostModal()" class="btn btn-primary">+ Add New Host</button>
+                    <button onclick="openAddHostModal()" class="btn btn-primary" data-i18n="btn_add_host">+ Novo Dispositivo</button>
                 </div>
                 <div style="overflow-x: auto;">
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>Host Name</th>
-                                <th>IP / Target</th>
-                                <th>Location (Macro)</th>
-                                <th>Parent Host (Hierarchy)</th>
-                                <th>Grouping</th>
-                                <th>Status</th>
-                                <th style="text-align: right;">Actions</th>
+                                <th data-i18n="th_host_name">Nome</th>
+                                <th data-i18n="th_ip_target">IP / Host</th>
+                                <th data-i18n="th_location">Localização (Macro)</th>
+                                <th data-i18n="th_parent">Dispositivo Pai (Hierarquia)</th>
+                                <th data-i18n="th_grouping">Agrupamento</th>
+                                <th data-i18n="th_status">Status</th>
+                                <th style="text-align: right;" data-i18n="th_actions">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="hosts-table-body">
@@ -137,20 +143,20 @@
             <div class="panel-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <div>
-                        <h2 style="font-size: 1.2rem; color: #fff;">Host Groupings</h2>
-                        <p style="font-size: 0.82rem; color: var(--text-dim);">Aggregate multiple host responses into a single combined up/down state.</p>
+                        <h2 style="font-size: 1.2rem; color: #fff;" data-i18n="admin_groups_title">Agrupamentos de Dispositivos</h2>
+                        <p style="font-size: 0.82rem; color: var(--text-dim);" data-i18n="admin_groups_desc">Agregue múltiplos dispositivos em um único estado consolidado de ONLINE / OFFLINE.</p>
                     </div>
-                    <button onclick="openAddGroupModal()" class="btn btn-primary">+ Add Group</button>
+                    <button onclick="openAddGroupModal()" class="btn btn-primary" data-i18n="btn_add_group">+ Novo Grupo</button>
                 </div>
                 <div style="overflow-x: auto;">
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>Group Name</th>
-                                <th>Aggregation Mode</th>
-                                <th>Assigned Hosts</th>
-                                <th>Description</th>
-                                <th style="text-align: right;">Actions</th>
+                                <th data-i18n="th_group_name">Nome do Grupo</th>
+                                <th data-i18n="th_aggregation_mode">Modo de Agregação</th>
+                                <th data-i18n="th_assigned_hosts">Dispositivos Atribuídos</th>
+                                <th data-i18n="th_description">Descrição</th>
+                                <th style="text-align: right;" data-i18n="th_actions">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="groups-table-body">
@@ -165,47 +171,47 @@
         <section id="tab-csv" class="admin-tab-panel">
             <div class="grid-2">
                 <div class="panel-card">
-                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">📥 Bulk Import from CSV</h2>
-                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;">
-                        Upload a CSV file containing your network inventory. Parent devices and groups will be automatically resolved.
+                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;" data-i18n="csv_import_title">📥 Importação em Lote via CSV</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="csv_import_desc">
+                        Envie um arquivo CSV com o inventário da rede. O relacionamento hierárquico e grupos serão resolvidos automaticamente.
                     </p>
                     <form id="csv-import-form" onsubmit="handleCsvUpload(event)">
                         <div class="form-group">
-                            <label class="form-label">Select CSV File</label>
+                            <label class="form-label" data-i18n="csv_select_file">Selecionar Arquivo CSV</label>
                             <input type="file" id="csv-file-input" class="form-control" accept=".csv,text/csv">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Or Paste CSV Content Directly</label>
+                            <label class="form-label" data-i18n="csv_paste_direct">Ou Cole o Conteúdo CSV Diretamente</label>
                             <textarea id="csv-raw-text" class="form-control" rows="8" placeholder="name,ip_address,location,parent,grouping,group_mode,description&#10;Core-Router,192.168.1.1,HQ,,,any,Gateway"></textarea>
                         </div>
                         <button type="submit" id="btn-csv-import" class="btn btn-primary" style="margin-top: 8px;">
-                            🚀 Upload & Import Hosts
+                            <span data-i18n="btn_upload_csv">🚀 Enviar & Importar Dispositivos</span>
                         </button>
                     </form>
                 </div>
 
                 <div class="panel-card">
-                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">📤 Export & Templates</h2>
-                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;">
-                        Download templates or export current database contents.
+                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;" data-i18n="csv_export_title">📤 Exportação & Modelos</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="csv_export_desc">
+                        Baixe arquivos de exemplo ou exporte o banco de dados atual.
                     </p>
                     <div style="display: flex; flex-direction: column; gap: 14px;">
                         <div style="background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                            <h4 style="color: #fff; font-size: 0.95rem; margin-bottom: 4px;">Download CSV Template</h4>
-                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
-                                Pre-formatted CSV sample file with proper headers, hierarchy, and groups.
+                            <h4 style="color: #fff; font-size: 0.95rem; margin-bottom: 4px;" data-i18n="csv_download_template">Baixar Modelo de CSV</h4>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="csv_template_desc">
+                                Arquivo CSV de exemplo pré-formatado com cabeçalhos, hierarquia e grupos.
                             </p>
-                            <a href="/api/admin/csv/template" download="netmap_template.csv" class="btn btn-outline">
-                                📄 Download Template CSV
+                            <a href="/api/admin/csv/template" download="netmap_template.csv" class="btn btn-outline" data-i18n="btn_download_template">
+                                📄 Baixar CSV de Exemplo
                             </a>
                         </div>
                         <div style="background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                            <h4 style="color: #fff; font-size: 0.95rem; margin-bottom: 4px;">Export Database to CSV</h4>
-                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
-                                Export all currently configured hosts, groups, and hierarchy relationships.
+                            <h4 style="color: #fff; font-size: 0.95rem; margin-bottom: 4px;" data-i18n="csv_export_db">Exportar Banco de Dados</h4>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="csv_export_desc_2">
+                                Exporta todos os dispositivos, grupos e relacionamentos cadastrados.
                             </p>
-                            <a href="/api/admin/csv/export" download="netmap_hosts.csv" class="btn btn-outline">
-                                💾 Export Current Hosts CSV
+                            <a href="/api/admin/csv/export" download="netmap_hosts.csv" class="btn btn-outline" data-i18n="btn_export_db">
+                                💾 Exportar Dispositivos em CSV
                             </a>
                         </div>
                     </div>
@@ -216,47 +222,47 @@
         <!-- TAB 4: SETTINGS (.cfg) -->
         <section id="tab-settings" class="admin-tab-panel">
             <div class="panel-card" style="max-width: 680px;">
-                <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">System Configuration</h2>
-                <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 20px;">
-                    Changes are automatically written to <code>netmap.cfg</code> and applied immediately to the background engine.
+                <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;" data-i18n="settings_title">Configuração do Sistema</h2>
+                <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 20px;" data-i18n="settings_desc">
+                    As alterações são salvas automaticamente no arquivo <code>netmap.cfg</code> e aplicadas imediatamente ao motor de sondagem.
                 </p>
                 <form id="settings-form" onsubmit="handleSettingsSubmit(event)">
                     <div class="grid-2">
                         <div class="form-group">
-                            <label class="form-label">Auto-Polling Interval (Seconds)</label>
+                            <label class="form-label" data-i18n="set_interval_label">Intervalo de Sondagem Automática (Segundos)</label>
                             <input type="number" id="set-interval" class="form-control" min="5" max="86400" required>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Parallel Ping Threads / Workers</label>
+                            <label class="form-label" data-i18n="set_threads_label">Threads / Tarefas de Ping Paralelas</label>
                             <input type="number" id="set-threads" class="form-control" min="1" max="500" required>
                         </div>
                     </div>
                     <div class="grid-2">
                         <div class="form-group">
-                            <label class="form-label">Ping Timeout (Seconds)</label>
+                            <label class="form-label" data-i18n="set_timeout_label">Tempo Limite de Resposta do Ping (Segundos)</label>
                             <input type="number" id="set-timeout" class="form-control" min="1" max="10" required>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Ping Count (Packets per Host)</label>
+                            <label class="form-label" data-i18n="set_count_label">Pacotes por Sondagem (por Host)</label>
                             <input type="number" id="set-count" class="form-control" min="1" max="5" required>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">History Retention (Hours, min 24h)</label>
+                        <label class="form-label" data-i18n="set_retention_label">Retenção de Histórico (Horas, mín 24h)</label>
                         <input type="number" id="set-retention" class="form-control" min="24" max="8760" required>
                     </div>
                     <div class="grid-2">
                         <div class="form-group">
-                            <label class="form-label">Server Bind Address</label>
+                            <label class="form-label" data-i18n="set_host_label">Endereço de Escuta (Bind IP)</label>
                             <input type="text" id="set-host" class="form-control" required>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Server TCP Port</label>
+                            <label class="form-label" data-i18n="set_port_label">Porta TCP do Servidor</label>
                             <input type="number" id="set-port" class="form-control" min="1" max="65535" required>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary" style="margin-top: 12px;">
-                        💾 Save Configuration to netmap.cfg
+                        <span data-i18n="btn_save_settings">💾 Salvar Configurações no netmap.cfg</span>
                     </button>
                 </form>
             </div>
@@ -266,18 +272,18 @@
         <section id="tab-users" class="admin-tab-panel">
             <div class="grid-2">
                 <div class="panel-card">
-                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">Manage Users</h2>
-                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;">
-                        Admin: full configuration and database access.<br>
-                        Operator: can force poll from the public dashboard.
+                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;" data-i18n="users_title">Gerenciamento de Usuários</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="users_desc">
+                        Administrador: acesso total ao sistema e banco de dados.<br>
+                        Operador: permissão para forçar sondagem na tela principal.
                     </p>
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>Username</th>
-                                <th>Role</th>
-                                <th>Created</th>
-                                <th style="text-align: right;">Action</th>
+                                <th data-i18n="th_username">Usuário</th>
+                                <th data-i18n="th_role">Papel</th>
+                                <th data-i18n="th_created">Criado em</th>
+                                <th style="text-align: right;" data-i18n="th_actions">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="users-table-body">
@@ -287,28 +293,28 @@
                 </div>
 
                 <div class="panel-card">
-                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">Create User Account</h2>
-                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;">
-                        Add a new administrator or operator.
+                    <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;" data-i18n="users_create_title">Cadastrar Nova Conta</h2>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="users_create_desc">
+                        Adicione um novo operador ou administrador.
                     </p>
                     <form id="user-create-form" onsubmit="handleUserCreate(event)">
                         <div class="form-group">
-                            <label class="form-label">Username</label>
-                            <input type="text" id="new-user-name" class="form-control" required placeholder="jdoe">
+                            <label class="form-label" data-i18n="username_label">Nome de Usuário</label>
+                            <input type="text" id="new-user-name" class="form-control" required placeholder="ex: jsilva">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Password</label>
+                            <label class="form-label" data-i18n="password_label">Senha</label>
                             <input type="password" id="new-user-pass" class="form-control" required placeholder="••••••••">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Role</label>
+                            <label class="form-label" data-i18n="th_role">Papel</label>
                             <select id="new-user-role" class="form-control">
-                                <option value="operator">Operator (Can trigger force poll)</option>
-                                <option value="admin">Administrator (Full Access)</option>
+                                <option value="operator" data-i18n="role_operator">Operador (Pode forçar sondagens)</option>
+                                <option value="admin" data-i18n="role_admin">Administrador (Acesso Completo)</option>
                             </select>
                         </div>
                         <button type="submit" class="btn btn-primary" style="margin-top: 8px;">
-                            + Create Account
+                            <span data-i18n="btn_create_user">+ Criar Conta</span>
                         </button>
                     </form>
                 </div>
@@ -318,28 +324,28 @@
         <!-- TAB 6: MAINTENANCE -->
         <section id="tab-maintenance" class="admin-tab-panel">
             <div class="panel-card" style="max-width: 700px;">
-                <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;">Dual Database Health & Storage</h2>
-                <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 20px;">
-                    Monitor <code>hosts.db</code> (inventory) and <code>history.db</code> (time-series status).
+                <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;" data-i18n="maint_title">Saúde dos Bancos de Dados & Armazenamento</h2>
+                <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 20px;" data-i18n="maint_desc">
+                    Monitore os bancos <code>hosts.db</code> (inventário) e <code>history.db</code> (série temporal).
                 </p>
                 <div class="grid-2" style="margin-bottom: 20px;">
                     <div style="background: var(--bg-subtle); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">HOSTS DATABASE</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="db_hosts_label">BANCO DE DISPOSITIVOS</div>
                         <div style="font-size: 1.5rem; font-weight: 700; color: #fff;" id="stat-db-hosts">—</div>
-                        <div style="font-size: 0.75rem; color: var(--text-dim);">Size: <span id="stat-db-hosts-size">—</span></div>
+                        <div style="font-size: 0.75rem; color: var(--text-dim);">Tamanho: <span id="stat-db-hosts-size">—</span></div>
                     </div>
                     <div style="background: var(--bg-subtle); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">HISTORY DATABASE</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="db_history_label">BANCO DE HISTÓRICO</div>
                         <div style="font-size: 1.5rem; font-weight: 700; color: #fff;" id="stat-db-history">—</div>
-                        <div style="font-size: 0.75rem; color: var(--text-dim);">Indexed time-series records</div>
+                        <div style="font-size: 0.75rem; color: var(--text-dim);" data-i18n="db_records_label">registros temporais indexados</div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 12px; align-items: center;">
-                    <button onclick="triggerManualPrune()" class="btn btn-outline">
-                        🧹 Run Retention Prune Now
+                    <button onclick="triggerManualPrune()" class="btn btn-outline" data-i18n="btn_run_prune">
+                        🧹 Executar Limpeza de Histórico Agora
                     </button>
-                    <button onclick="loadStats()" class="btn btn-outline">
-                        ↻ Refresh Stats
+                    <button onclick="loadStats()" class="btn btn-outline" data-i18n="btn_refresh_stats">
+                        ↻ Atualizar Estatísticas
                     </button>
                 </div>
             </div>
@@ -350,27 +356,27 @@
     <div id="host-modal" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
-                <h3 class="modal-title" id="host-modal-title">Host Details</h3>
+                <h3 class="modal-title" id="host-modal-title" data-i18n="modal_add_host_title">Novo Dispositivo</h3>
                 <button class="modal-close" onclick="closeHostModal()">&times;</button>
             </div>
             <form id="host-form" class="modal-body" onsubmit="handleHostSubmit(event)">
                 <div class="grid-2">
                     <div class="form-group">
-                        <label class="form-label">Host Name *</label>
-                        <input type="text" id="host-form-name" class="form-control" required placeholder="e.g. Core-Router-01">
+                        <label class="form-label" data-i18n="field_host_name">Nome do Dispositivo *</label>
+                        <input type="text" id="host-form-name" class="form-control" required placeholder="ex: Roteador-Principal-01">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">IP Address or Hostname *</label>
-                        <input type="text" id="host-form-ip" class="form-control" required placeholder="e.g. 192.168.1.1">
+                        <label class="form-label" data-i18n="field_ip">Endereço IP ou Hostname *</label>
+                        <input type="text" id="host-form-ip" class="form-control" required placeholder="ex: 192.168.1.1">
                     </div>
                 </div>
                 <div class="grid-2">
                     <div class="form-group">
-                        <label class="form-label">Location (Macro Hierarchy) *</label>
-                        <input type="text" id="host-form-location" class="form-control" required placeholder="e.g. HQ Datacenter">
+                        <label class="form-label" data-i18n="field_location">Localização (Macro) *</label>
+                        <input type="text" id="host-form-location" class="form-control" required placeholder="ex: Datacenter Central">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Parent Device (Tree Hierarchy)</label>
+                        <label class="form-label" data-i18n="field_parent">Dispositivo Pai (Hierarquia)</label>
                         <select id="host-form-parent" class="form-control">
                             <!-- Populated dynamically -->
                         </select>
@@ -378,23 +384,23 @@
                 </div>
                 <div class="grid-2">
                     <div class="form-group">
-                        <label class="form-label">Grouping (Optional)</label>
+                        <label class="form-label" data-i18n="field_group">Agrupamento (Opcional)</label>
                         <select id="host-form-group" class="form-control">
                             <!-- Populated dynamically -->
                         </select>
                     </div>
                     <div class="form-group" style="display: flex; align-items: center; gap: 10px; padding-top: 24px;">
                         <input type="checkbox" id="host-form-active" style="width: 18px; height: 18px;">
-                        <label for="host-form-active" class="form-label" style="margin-bottom: 0; cursor: pointer;">Enable Polling (Active)</label>
+                        <label for="host-form-active" class="form-label" style="margin-bottom: 0; cursor: pointer;" data-i18n="field_active">Ativar Sondagem (Monitorar)</label>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Description / Notes</label>
-                    <input type="text" id="host-form-desc" class="form-control" placeholder="Primary uplink router">
+                    <label class="form-label" data-i18n="field_desc">Descrição / Observações</label>
+                    <input type="text" id="host-form-desc" class="form-control" placeholder="Roteador de borda principal">
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                    <button type="button" class="btn btn-outline" onclick="closeHostModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Host</button>
+                    <button type="button" class="btn btn-outline" onclick="closeHostModal()" data-i18n="btn_cancel">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" data-i18n="btn_save_host">Salvar Dispositivo</button>
                 </div>
             </form>
         </div>
@@ -404,31 +410,31 @@
     <div id="group-modal" class="modal-overlay">
         <div class="modal-card" style="max-width: 480px;">
             <div class="modal-header">
-                <h3 class="modal-title" id="group-modal-title">Group Details</h3>
+                <h3 class="modal-title" id="group-modal-title" data-i18n="modal_add_group_title">Novo Grupo</h3>
                 <button class="modal-close" onclick="closeGroupModal()">&times;</button>
             </div>
             <form id="group-form" class="modal-body" onsubmit="handleGroupSubmit(event)">
                 <div class="form-group">
-                    <label class="form-label">Group Name *</label>
-                    <input type="text" id="group-form-name" class="form-control" required placeholder="e.g. Web-Cluster">
+                    <label class="form-label" data-i18n="field_group_name">Nome do Grupo *</label>
+                    <input type="text" id="group-form-name" class="form-control" required placeholder="ex: Cluster-Web">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Aggregation Mode *</label>
+                    <label class="form-label" data-i18n="field_group_mode">Modo de Agregação *</label>
                     <select id="group-form-mode" class="form-control" required>
-                        <option value="any">Any Host UP = Group UP (Redundancy / HA)</option>
-                        <option value="all">All Hosts UP = Group UP (Strict Cluster Health)</option>
+                        <option value="any" data-i18n="mode_any">Qualquer Host ONLINE = Grupo ONLINE (Redundância / HA)</option>
+                        <option value="all" data-i18n="mode_all">Todos os Hosts ONLINE = Grupo ONLINE (Cluster Estrito)</option>
                     </select>
-                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
-                        "Any Up" is ideal for load-balanced or redundant clusters where 1 working node keeps service up.
+                    <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;" data-i18n="field_group_mode_hint">
+                        'Qualquer host ONLINE' é ideal para clusters balanceados ou com redundância (HA).
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Description</label>
-                    <input type="text" id="group-form-desc" class="form-control" placeholder="Production web tier">
+                    <label class="form-label" data-i18n="th_description">Descrição</label>
+                    <input type="text" id="group-form-desc" class="form-control" placeholder="Servidores web de produção">
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                    <button type="button" class="btn btn-outline" onclick="closeGroupModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Group</button>
+                    <button type="button" class="btn btn-outline" onclick="closeGroupModal()" data-i18n="btn_cancel">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" data-i18n="btn_save_group">Salvar Grupo</button>
                 </div>
             </form>
         </div>
@@ -437,6 +443,7 @@
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
 
+    <script src="/static/js/i18n.js"></script>
     <script src="/static/js/admin.js"></script>
 </body>
 </html>

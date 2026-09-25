@@ -6,8 +6,10 @@ let countdownInterval = null;
 let secondsUntilNextPoll = 0;
 let currentTimelineHostId = null;
 let currentTimelineHours = 24;
+let currentDensity = localStorage.getItem("netmap_density") || "compact";
 
 document.addEventListener("DOMContentLoaded", () => {
+    initDensity();
     initAuth();
     loadDashboard();
     setupEventListeners();
@@ -15,6 +17,41 @@ document.addEventListener("DOMContentLoaded", () => {
     // Auto refresh status and tree periodically
     setInterval(refreshData, 10000);
 });
+
+// ----------------- Density (Compact / Tall) -----------------
+
+function initDensity() {
+    setDensity(currentDensity, false);
+}
+
+function setDensity(mode, shouldRerender = true) {
+    currentDensity = mode;
+    localStorage.setItem("netmap_density", mode);
+    
+    if (mode === "tall") {
+        document.body.classList.add("density-tall");
+        document.body.classList.remove("density-compact");
+    } else {
+        document.body.classList.add("density-compact");
+        document.body.classList.remove("density-tall");
+    }
+
+    const btnCompact = document.getElementById("density-btn-compact");
+    const btnTall = document.getElementById("density-btn-tall");
+    if (btnCompact && btnTall) {
+        if (mode === "tall") {
+            btnTall.classList.add("active");
+            btnCompact.classList.remove("active");
+        } else {
+            btnCompact.classList.add("active");
+            btnTall.classList.remove("active");
+        }
+    }
+
+    if (shouldRerender) {
+        renderTree();
+    }
+}
 
 // ----------------- Auth State -----------------
 
@@ -41,7 +78,7 @@ function renderAuthUI() {
     if (currentUser) {
         let adminLink = "";
         if (currentUser.role === "admin") {
-            adminLink = `<a href="/admin" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">⚙️ Admin</a>`;
+            adminLink = `<a href="/admin" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">${t("btn_admin")}</a>`;
         }
         authContainer.innerHTML = `
             ${adminLink}
@@ -49,15 +86,15 @@ function renderAuthUI() {
                 👤 <strong>${escapeHtml(currentUser.username)}</strong>
                 <span style="font-size: 0.7rem; padding: 1px 5px; background: rgba(59,130,246,0.2); border-radius: 3px; color: #60a5fa;">${currentUser.role}</span>
             </span>
-            <button onclick="handleLogout()" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.78rem;">Logout</button>
+            <button onclick="handleLogout()" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.78rem;">${t("btn_logout")}</button>
         `;
         forcePollBtn.removeAttribute("title");
         forcePollBtn.classList.remove("disabled");
     } else {
         authContainer.innerHTML = `
-            <button onclick="openLoginModal()" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;">Sign In</button>
+            <button onclick="openLoginModal()" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;">${t("btn_sign_in")}</button>
         `;
-        forcePollBtn.setAttribute("title", "Only logged-in users can force a poll");
+        forcePollBtn.setAttribute("title", t("auth_required_poll"));
     }
 }
 
@@ -66,7 +103,7 @@ async function handleLogout() {
         await fetch("/api/auth/logout", { method: "POST" });
         currentUser = null;
         renderAuthUI();
-        showToast("Logged out successfully", "success");
+        showToast(t("logged_out_success"), "success");
     } catch (err) {
         console.error("Logout failed:", err);
     }
@@ -101,12 +138,12 @@ async function handleLoginSubmit(e) {
             currentUser = data.user;
             closeLoginModal();
             renderAuthUI();
-            showToast(`Welcome back, ${data.user.username}!`, "success");
+            showToast(`${t("welcome_user")} ${data.user.username}!`, "success");
         } else {
-            errDiv.innerText = data.detail || "Authentication failed";
+            errDiv.innerText = data.detail || t("login_error_generic");
         }
     } catch (err) {
-        errDiv.innerText = "Network error. Could not connect to server.";
+        errDiv.innerText = t("login_error_network");
     }
 }
 
@@ -138,7 +175,7 @@ async function loadStatus() {
             const dt = new Date(data.last_poll_time * 1000);
             document.getElementById("last-poll-time").innerText = dt.toLocaleTimeString();
         } else {
-            document.getElementById("last-poll-time").innerText = "Never";
+            document.getElementById("last-poll-time").innerText = "—";
         }
 
         if (data.next_poll_in_seconds !== null && data.next_poll_in_seconds !== undefined) {
@@ -161,7 +198,7 @@ function startCountdown() {
             secondsUntilNextPoll--;
             elem.innerText = `${secondsUntilNextPoll}s`;
         } else {
-            elem.innerText = "Polling...";
+            elem.innerText = t("polling_now");
         }
     }, 1000);
 }
@@ -188,13 +225,12 @@ function renderLocationFilters() {
     const tabsContainer = document.getElementById("location-tabs");
     if (!tabsContainer) return;
 
-    // Fetch all locations if currently filtered to populate full tabs
     fetch("/api/tree").then(r => r.json()).then(fullData => {
         const locs = fullData.locations || [];
         let html = `
             <button class="pill-tab ${activeLocationFilter === 'all' ? 'active' : ''}" 
                     onclick="filterLocation('all')">
-                All Sites (${locs.reduce((acc, l) => acc + l.total_count, 0)})
+                ${t("all_sites")} (${locs.reduce((acc, l) => acc + l.total_count, 0)})
             </button>
         `;
         locs.forEach(l => {
@@ -225,11 +261,11 @@ function renderTree() {
         container.innerHTML = `
             <div style="text-align: center; padding: 60px 20px; color: var(--text-dim);">
                 <div style="font-size: 2.5rem; margin-bottom: 12px;">📡</div>
-                <h3 style="color: var(--text-muted); margin-bottom: 8px;">No Hosts Configured Yet</h3>
+                <h3 style="color: var(--text-muted); margin-bottom: 8px;">${t("no_hosts_title")}</h3>
                 <p style="font-size: 0.9rem; max-width: 480px; margin: 0 auto 16px;">
-                    Get started by logging in as an administrator to add your network hosts or upload a CSV file.
+                    ${t("no_hosts_desc")}
                 </p>
-                <button onclick="openLoginModal()" class="btn btn-primary">Sign In as Admin</button>
+                <button onclick="openLoginModal()" class="btn btn-primary">${t("btn_sign_in_admin")}</button>
             </div>
         `;
         return;
@@ -242,18 +278,18 @@ function renderTree() {
                 <div class="location-header">
                     <div class="location-title">
                         <span>📍 ${escapeHtml(loc.name)}</span>
-                        <span class="location-badge">${loc.total_count} hosts</span>
+                        <span class="location-badge">${loc.total_count} ${t("hosts_count_suffix")}</span>
                     </div>
                     <div style="display: flex; gap: 14px; font-size: 0.8rem; font-family: var(--font-mono);">
-                        <span style="color: var(--up-color);">● ${loc.up_count} UP</span>
-                        <span style="color: var(--down-color);">● ${loc.down_count} DOWN</span>
+                        <span style="color: var(--up-color);">● ${loc.up_count} ${t("status_up")}</span>
+                        <span style="color: var(--down-color);">● ${loc.down_count} ${t("status_down")}</span>
                     </div>
                 </div>
                 <div class="tree-container">
         `;
 
         if (loc.roots.length === 0) {
-            html += `<div style="color: var(--text-dim); font-size: 0.85rem; padding: 12px;">No root devices in this location.</div>`;
+            html += `<div style="color: var(--text-dim); font-size: 0.85rem; padding: 12px;">${t("no_roots")}</div>`;
         } else {
             loc.roots.forEach(rootNode => {
                 html += `
@@ -295,16 +331,16 @@ function renderTreeNodeBranch(node) {
 
 function renderHostCard(node) {
     let statusClass = "status-unpolled";
-    let statusText = "UNKNOWN";
+    let statusText = t("status_unknown");
     let statusBadgeClass = "unpolled";
 
     if (node.is_up === true) {
         statusClass = "status-up";
-        statusText = "UP";
+        statusText = t("status_up");
         statusBadgeClass = "up";
     } else if (node.is_up === false) {
         statusClass = "status-down";
-        statusText = "DOWN";
+        statusText = t("status_down");
         statusBadgeClass = "down";
     }
 
@@ -317,33 +353,55 @@ function renderHostCard(node) {
             statusClass = "status-degraded";
             grpInfo += ` (${grpStatus.hosts_up}/${grpStatus.hosts_total})`;
         }
-        groupHtml = `<span class="group-badge" title="Group: ${escapeHtml(node.grouping)} (${node.group_mode})">${grpInfo}</span>`;
+        groupHtml = `<span class="group-badge" title="${t("group_label")} ${escapeHtml(node.grouping)} (${node.group_mode})">${grpInfo}</span>`;
     }
 
     let rttDisplay = "—";
     if (node.rtt_ms !== null && node.rtt_ms !== undefined) {
         rttDisplay = `${node.rtt_ms.toFixed(1)}ms`;
     } else if (node.is_up === false) {
-        rttDisplay = "Down";
+        rttDisplay = t("status_timeout");
     }
 
-    // Abbreviated 30-minute sparkline without label line
     let sparklineHtml = renderSparkline30m(node.sparkline_30m);
 
-    return `
-        <div class="host-card ${statusClass}" onclick="openTimelineModal(${node.id})" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)}) - ${statusText} - Click for 24h timeline">
-            <span class="status-dot ${statusBadgeClass}"></span>
-            <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
-            <span class="ip-badge">${escapeHtml(node.ip_address)}</span>
-            ${groupHtml}
-            <span class="rtt-val">${rttDisplay}</span>
-            ${sparklineHtml}
-        </div>
-    `;
+    // Render Compact (20px) vs Tall (Comfortable)
+    if (currentDensity === "tall") {
+        return `
+            <div class="host-card ${statusClass}" onclick="openTimelineModal(${node.id})" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)}) - ${statusText} - ${t("click_timeline_tooltip")}">
+                <div class="card-row-top">
+                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                        <span class="status-dot ${statusBadgeClass}"></span>
+                        <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
+                    </div>
+                    ${groupHtml}
+                </div>
+                <div class="card-row-bottom">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="ip-badge">${escapeHtml(node.ip_address)}</span>
+                        <span class="rtt-val">${rttDisplay}</span>
+                    </div>
+                    ${sparklineHtml}
+                </div>
+            </div>
+        `;
+    } else {
+        // Ultra-Compact 20px
+        return `
+            <div class="host-card ${statusClass}" onclick="openTimelineModal(${node.id})" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)}) - ${statusText} - ${t("click_timeline_tooltip")}">
+                <span class="status-dot ${statusBadgeClass}"></span>
+                <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
+                <span class="ip-badge">${escapeHtml(node.ip_address)}</span>
+                ${groupHtml}
+                <span class="rtt-val">${rttDisplay}</span>
+                ${sparklineHtml}
+            </div>
+        `;
+    }
 }
 
 function renderSparkline30m(records) {
-    const slotCount = 16;
+    const slotCount = currentDensity === "tall" ? 20 : 16;
     let slots = [];
     
     if (records && records.length > 0) {
@@ -351,15 +409,15 @@ function renderSparkline30m(records) {
         recent.forEach(r => {
             const cls = r.up ? "up" : "down";
             const dateStr = new Date(r.t * 1000).toLocaleTimeString();
-            const rttStr = r.rtt !== null ? `${r.rtt}ms` : "Down";
-            slots.push(`<div class="spark-dot ${cls}" title="${dateStr} - ${r.up ? 'UP' : 'DOWN'} (${rttStr})"></div>`);
+            const rttStr = r.rtt !== null ? `${r.rtt}ms` : t("status_down");
+            slots.push(`<div class="spark-dot ${cls}" title="${dateStr} - ${r.up ? t("status_up") : t("status_down")} (${rttStr})"></div>`);
         });
         while (slots.length < slotCount) {
-            slots.unshift(`<div class="spark-dot empty" title="No check data"></div>`);
+            slots.unshift(`<div class="spark-dot empty" title="${t("no_records_window")}"></div>`);
         }
     } else {
         for (let i = 0; i < slotCount; i++) {
-            slots.push(`<div class="spark-dot empty" title="No check data"></div>`);
+            slots.push(`<div class="spark-dot empty" title="${t("no_records_window")}"></div>`);
         }
     }
 
@@ -378,7 +436,7 @@ async function openTimelineModal(hostId, hours = 24) {
     const contentDiv = document.getElementById("timeline-modal-content");
     contentDiv.innerHTML = `
         <div style="text-align: center; padding: 40px; color: var(--text-dim);">
-            <div class="spinner"></div> Loading host timeline...
+            <div class="spinner"></div> ${t("loading_hierarchy")}
         </div>
     `;
 
@@ -388,7 +446,7 @@ async function openTimelineModal(hostId, hours = 24) {
         const data = await res.json();
         renderTimelineData(data);
     } catch (err) {
-        contentDiv.innerHTML = `<div style="color: var(--down-color); text-align: center; padding: 20px;">Failed to load host history.</div>`;
+        contentDiv.innerHTML = `<div style="color: var(--down-color); text-align: center; padding: 20px;">${t("login_error_network")}</div>`;
     }
 }
 
@@ -404,31 +462,31 @@ function renderTimelineData(data) {
     if (records.length > 0) {
         records.forEach(r => {
             const dt = new Date(r.timestamp * 1000).toLocaleString();
-            const rttStr = r.rtt_ms ? `${r.rtt_ms.toFixed(1)}ms` : "Down";
+            const rttStr = r.rtt_ms ? `${r.rtt_ms.toFixed(1)}ms` : t("status_down");
             const cls = r.is_up ? "up" : "down";
-            slicesHtml += `<div class="timeline-slice ${cls}" title="${dt} - ${r.is_up ? 'UP' : 'DOWN'} (${rttStr})"></div>`;
+            slicesHtml += `<div class="timeline-slice ${cls}" title="${dt} - ${r.is_up ? t("status_up") : t("status_down")} (${rttStr})"></div>`;
         });
     } else {
-        slicesHtml = `<div style="padding: 4px; color: var(--text-dim); font-size: 0.8rem;">No poll records in selected window.</div>`;
+        slicesHtml = `<div style="padding: 4px; color: var(--text-dim); font-size: 0.8rem;">${t("no_records_window")}</div>`;
     }
 
     let incidentsHtml = "";
     if (incidents.length > 0) {
         incidentsHtml = `
             <div style="margin-top: 14px;">
-                <h4 style="font-size: 0.95rem; margin-bottom: 8px;">Downtime Incidents (${incidents.length})</h4>
+                <h4 style="font-size: 0.95rem; margin-bottom: 8px;">${t("incidents_title")} (${incidents.length})</h4>
                 <table class="incident-table">
                     <thead>
                         <tr>
-                            <th>Started</th>
-                            <th>Resolved</th>
-                            <th>Duration</th>
+                            <th>${t("th_started")}</th>
+                            <th>${t("th_resolved")}</th>
+                            <th>${t("th_duration")}</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${incidents.map(inc => {
                             const startStr = new Date(inc.start * 1000).toLocaleTimeString();
-                            const endStr = inc.end ? new Date(inc.end * 1000).toLocaleTimeString() : '<span style="color: var(--down-color); font-weight: 700;">Ongoing</span>';
+                            const endStr = inc.end ? new Date(inc.end * 1000).toLocaleTimeString() : `<span style="color: var(--down-color); font-weight: 700;">${t("incident_ongoing")}</span>`;
                             const mins = Math.round(inc.duration_seconds / 60);
                             const durStr = mins >= 60 ? `${(mins/60).toFixed(1)}h` : `${mins}m (${inc.duration_seconds}s)`;
                             return `
@@ -446,7 +504,7 @@ function renderTimelineData(data) {
     } else {
         incidentsHtml = `
             <div style="color: var(--up-color); font-size: 0.85rem; padding: 10px 0;">
-                ✓ 100% operational with 0 downtime incidents in this period.
+                ${t("zero_incidents")}
             </div>
         `;
     }
@@ -456,10 +514,10 @@ function renderTimelineData(data) {
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
             <div>
                 <div style="font-size: 0.85rem; color: var(--text-muted);">
-                    <strong>IP:</strong> ${escapeHtml(host.ip_address)} &nbsp;|&nbsp; 
-                    <strong>Location:</strong> ${escapeHtml(host.location)}
-                    ${host.grouping ? `&nbsp;|&nbsp; <strong>Group:</strong> ${escapeHtml(host.grouping)}` : ""}
-                    ${host.parent_name ? `&nbsp;|&nbsp; <strong>Parent:</strong> ${escapeHtml(host.parent_name)}` : ""}
+                    <strong>${t("ip_label")}</strong> ${escapeHtml(host.ip_address)} &nbsp;|&nbsp; 
+                    <strong>${t("location_label")}</strong> ${escapeHtml(host.location)}
+                    ${host.grouping ? `&nbsp;|&nbsp; <strong>${t("group_label")}</strong> ${escapeHtml(host.grouping)}` : ""}
+                    ${host.parent_name ? `&nbsp;|&nbsp; <strong>${t("parent_label")}</strong> ${escapeHtml(host.parent_name)}` : ""}
                 </div>
                 ${host.description ? `<div style="font-size: 0.82rem; color: var(--text-dim); margin-top: 4px;">${escapeHtml(host.description)}</div>` : ""}
             </div>
@@ -473,22 +531,22 @@ function renderTimelineData(data) {
 
         <div class="timeline-banner">
             <div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Uptime (${currentTimelineHours}h)</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">${t("uptime_label")} (${currentTimelineHours}h)</div>
                 <div class="uptime-stat" style="color: ${timeline.uptime_pct >= 99 ? 'var(--up-color)' : (timeline.uptime_pct >= 90 ? 'var(--degraded-color)' : 'var(--down-color)')}">
                     ${timeline.uptime_pct}%
                 </div>
             </div>
             <div style="text-align: right; font-size: 0.82rem; color: var(--text-muted);">
-                <div>Total Checks: <strong>${timeline.total_checks}</strong></div>
-                <div>Successful: <strong style="color: var(--up-color);">${timeline.up_checks}</strong></div>
-                <div>Failed: <strong style="color: var(--down-color);">${timeline.total_checks - timeline.up_checks}</strong></div>
+                <div>${t("total_checks")} <strong>${timeline.total_checks}</strong></div>
+                <div>${t("successful_checks")} <strong style="color: var(--up-color);">${timeline.up_checks}</strong></div>
+                <div>${t("failed_checks")} <strong style="color: var(--down-color);">${timeline.total_checks - timeline.up_checks}</strong></div>
             </div>
         </div>
 
         <div>
             <div style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 6px; display: flex; justify-content: space-between;">
-                <span>${currentTimelineHours} Hours Ago</span>
-                <span>Now</span>
+                <span>${currentTimelineHours} ${t("hours_ago")}</span>
+                <span>${t("now")}</span>
             </div>
             <div class="timeline-chart-bar">
                 ${slicesHtml}
@@ -507,7 +565,7 @@ function closeTimelineModal() {
 
 async function handleForcePoll() {
     if (!currentUser) {
-        showToast("Authentication required: Please sign in to force a poll.", "error");
+        showToast(t("auth_required_poll"), "error");
         openLoginModal();
         return;
     }
@@ -515,20 +573,22 @@ async function handleForcePoll() {
     const btn = document.getElementById("btn-force-poll");
     const origHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<span class="spinner"></span> Polling...`;
+    btn.innerHTML = `<span class="spinner"></span> ${t("polling_now")}`;
 
     try {
         const res = await fetch("/api/poll/force", { method: "POST" });
         const data = await res.json();
         
         if (res.ok && data.success) {
-            showToast(`Poll complete: ${data.result ? data.result.polled_count : ''} hosts checked in ${data.result ? data.result.duration : ''}s!`, "success");
+            const count = data.result ? data.result.polled_count : 0;
+            const dur = data.result ? data.result.duration : 0;
+            showToast(`${count} ${t("hosts_count_suffix")} (${dur}s)`, "success");
             await loadDashboard();
         } else {
-            showToast(data.detail || data.message || "Failed to trigger poll", "error");
+            showToast(data.detail || data.message || "Failed", "error");
         }
     } catch (err) {
-        showToast("Error executing force poll", "error");
+        showToast(t("login_error_network"), "error");
     } finally {
         btn.disabled = false;
         btn.innerHTML = origHtml;
