@@ -106,3 +106,117 @@ async def test_auth_and_force_poll_permissions():
         res_timeline = await client.get(f"/api/hosts/{host_id}/timeline")
         assert res_timeline.status_code == 200
         assert res_timeline.json()["host"]["name"] == "Router-1"
+
+@pytest.mark.asyncio
+async def test_grouping_consolidation_and_degraded_state():
+    from netmap.ping_engine import ping_engine, PingResult
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Login as admin
+        await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+
+        # Create group
+        grp_res = await client.post("/api/admin/groups", json={
+            "name": "Web-Cluster",
+            "aggregation_mode": "any",
+            "description": "High availability web frontend"
+        })
+        assert grp_res.status_code == 200
+
+        # Create 2 member hosts under the same location and parent
+        h1_res = await client.post("/api/admin/hosts", json={
+            "name": "web-node-01",
+            "ip_address": "192.168.1.10",
+            "location": "Datacenter Alpha",
+            "grouping": "Web-Cluster"
+        })
+        assert h1_res.status_code == 200
+        h1_id = h1_res.json()["id"]
+
+        h2_res = await client.post("/api/admin/hosts", json={
+            "name": "web-node-02",
+            "ip_address": "192.168.1.11",
+            "location": "Datacenter Alpha",
+            "grouping": "Web-Cluster"
+        })
+        assert h2_res.status_code == 200
+        h2_id = h2_res.json()["id"]
+
+        # Simulate: Node 1 is UP, Node 2 is DOWN (Timed out)
+        ping_engine.latest_host_status[h1_id] = PingResult(
+            host_id=h1_id,
+            is_up=True,
+            rtt_ms=12.5
+        )
+        ping_engine.latest_host_status[h2_id] = PingResult(
+            host_id=h2_id,
+            is_up=False,
+            rtt_ms=None,
+            error_msg="Timeout"
+        )
+
+        # 1. Verify /api/tree: Hosts replaced by Grouping name and marked as partially up (is_degraded = True)
+        tree_res = await client.get("/api/tree")
+        assert tree_res.status_code == 200
+        tree = tree_res.json()
+        loc = next(l for l in tree["locations"] if l["name"] == "Datacenter Alpha")
+        assert len(loc["roots"]) == 1
+        group_node = loc["roots"][0]
+
+        # Replaced with grouping name!
+        assert group_node["is_group"] is True
+        assert group_node["name"] == "Web-Cluster"
+        assert group_node["grouping"] == "Web-Cluster"
+        assert group_node["hosts_total"] == 2
+        assert group_node["hosts_up"] == 1
+        # Partially up logic: not all hosts are responsive -> is_degraded is True (Yellow box)
+        assert group_node["is_degraded"] is True
+        assert group_node["is_up"] is True
+        assert group_node["rtt_ms"] == 12.5
+
+        # 2. Verify /api/groups/Web-Cluster/timeline
+        grp_timeline_res = await client.get("/api/groups/Web-Cluster/timeline")
+        assert grp_timeline_res.status_code == 200
+        grp_data = grp_timeline_res.json()["group"]
+        assert grp_data["name"] == "Web-Cluster"
+        assert grp_data["is_degraded"] is True
+        assert grp_data["hosts_up"] == 1
+        assert grp_data["hosts_total"] == 2
+        assert len(grp_data["members"]) == 2
+        m1 = next(m for m in grp_data["members"] if m["id"] == h1_id)
+        m2 = next(m for m in grp_data["members"] if m["id"] == h2_id)
+        assert m1["is_up"] is True
+        assert m1["rtt_ms"] == 12.5
+        assert m2["is_up"] is False
+        assert m2["rtt_ms"] is None
+
+        # 3. Test when both are responsive -> is_degraded is False
+        ping_engine.latest_host_status[h2_id] = PingResult(
+            host_id=h2_id,
+            is_up=True,
+            rtt_ms=15.0
+        )
+        tree_res2 = await client.get("/api/tree")
+        group_node2 = tree_res2.json()["locations"][0]["roots"][0]
+        assert group_node2["is_degraded"] is False
+        assert group_node2["is_up"] is True
+        assert group_node2["hosts_up"] == 2
+
+        # 4. Test when both are down -> is_degraded is False, is_up is False
+        ping_engine.latest_host_status[h1_id] = PingResult(
+            host_id=h1_id,
+            is_up=False,
+            rtt_ms=None
+        )
+        ping_engine.latest_host_status[h2_id] = PingResult(
+            host_id=h2_id,
+            is_up=False,
+            rtt_ms=None
+        )
+        tree_res3 = await client.get("/api/tree")
+        group_node3 = tree_res3.json()["locations"][0]["roots"][0]
+        assert group_node3["is_degraded"] is False
+        assert group_node3["is_up"] is False
+        assert group_node3["hosts_up"] == 0
+

@@ -38,7 +38,15 @@ const TRANSLATIONS = {
         "status_down": "OFFLINE",
         "status_unknown": "DESCONHECIDO",
         "status_timeout": "Tempo Esgotado",
-        "group_degraded": "Degradado",
+        "status_partially_up": "Parcialmente Ativo",
+        "group_degraded": "Parcialmente Ativo",
+        "click_group_tooltip": "Clique para ver membros e status do grupo",
+        "modal_group_title": "Agrupamento de Dispositivos",
+        "group_status_label": "Status do Grupo:",
+        "aggregation_mode_label": "Modo de Agregação:",
+        "member_hosts_title": "Dispositivos Membros",
+        "th_latency": "Latência / RTT",
+        "btn_view_timeline": "Ver Histórico",
 
         // Timeline Modal
         "modal_timeline_title": "Histórico do Dispositivo",
@@ -223,7 +231,15 @@ const TRANSLATIONS = {
         "status_down": "DOWN",
         "status_unknown": "UNKNOWN",
         "status_timeout": "Timeout",
-        "group_degraded": "Degraded",
+        "status_partially_up": "Partially Up",
+        "group_degraded": "Partially Up",
+        "click_group_tooltip": "Click to view group members and status",
+        "modal_group_title": "Device Grouping",
+        "group_status_label": "Group Status:",
+        "aggregation_mode_label": "Aggregation Mode:",
+        "member_hosts_title": "Member Devices",
+        "th_latency": "Latency / RTT",
+        "btn_view_timeline": "View Timeline",
 
         // Timeline Modal
         "modal_timeline_title": "Host Timeline",

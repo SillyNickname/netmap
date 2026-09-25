@@ -282,6 +282,7 @@ function renderTree() {
                     </div>
                     <div style="display: flex; gap: 14px; font-size: 0.8rem; font-family: var(--font-mono);">
                         <span style="color: var(--up-color);">● ${loc.up_count} ${t("status_up")}</span>
+                        ${loc.degraded_count > 0 ? `<span style="color: var(--degraded-color);">● ${loc.degraded_count} ${t("status_partially_up")}</span>` : ''}
                         <span style="color: var(--down-color);">● ${loc.down_count} ${t("status_down")}</span>
                     </div>
                 </div>
@@ -334,7 +335,12 @@ function renderHostCard(node) {
     let statusText = t("status_unknown");
     let statusBadgeClass = "unpolled";
 
-    if (node.is_up === true) {
+    // Degradado / Parcialmente Ativo: use a yellow box
+    if (node.is_degraded) {
+        statusClass = "status-degraded";
+        statusText = t("status_partially_up");
+        statusBadgeClass = "degraded";
+    } else if (node.is_up === true) {
         statusClass = "status-up";
         statusText = t("status_up");
         statusBadgeClass = "up";
@@ -344,37 +350,42 @@ function renderHostCard(node) {
         statusBadgeClass = "down";
     }
 
-    // Grouping check
-    let groupHtml = "";
-    if (node.grouping) {
-        let grpStatus = node.group_status;
-        let grpInfo = `${escapeHtml(node.grouping)}`;
-        if (grpStatus && grpStatus.is_degraded) {
-            statusClass = "status-degraded";
-            grpInfo += ` (${grpStatus.hosts_up}/${grpStatus.hosts_total})`;
-        }
-        groupHtml = `<span class="group-badge" title="${t("group_label")} ${escapeHtml(node.grouping)} (${node.group_mode})">${grpInfo}</span>`;
-    }
-
+    // Ping time / RTT:
+    // If the ping requests time out, instead of stating so replace the time with a little red X emoji.
     let rttDisplay = "—";
     if (node.rtt_ms !== null && node.rtt_ms !== undefined) {
         rttDisplay = `${node.rtt_ms.toFixed(1)}ms`;
     } else if (node.is_up === false) {
-        rttDisplay = t("status_timeout");
+        rttDisplay = `<span class="timeout-emoji" title="${node.error_msg || t("status_timeout")}">❌</span>`;
     }
+
+    // Grouping indicator
+    let groupBadgeHtml = "";
+    if (node.is_group) {
+        const degradedCls = node.is_degraded ? "group-degraded" : "";
+        groupBadgeHtml = `<span class="group-badge ${degradedCls}" title="${node.hosts_up}/${node.hosts_total} ${t("hosts_count_suffix")} ${node.group_mode ? '(' + node.group_mode + ')' : ''}">👥 ${node.hosts_up}/${node.hosts_total}</span>`;
+    }
+
+    const clickAction = node.is_group 
+        ? `openGroupModal('${encodeURIComponent(node.grouping)}')` 
+        : `openTimelineModal(${node.id})`;
+
+    const cardTitle = node.is_group
+        ? `${escapeHtml(node.name)} (${node.hosts_up}/${node.hosts_total}) - ${statusText} - ${t("click_group_tooltip")}`
+        : `${escapeHtml(node.name)} (${escapeHtml(node.ip_address)}) - ${statusText} - ${t("click_timeline_tooltip")}`;
 
     let sparklineHtml = renderSparkline30m(node.sparkline_30m);
 
     // Render Compact (20px) vs Tall (Comfortable)
     if (currentDensity === "tall") {
         return `
-            <div class="host-card ${statusClass}" onclick="openTimelineModal(${node.id})" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)}) - ${statusText} - ${t("click_timeline_tooltip")}">
+            <div class="host-card ${statusClass}" onclick="${clickAction}" title="${cardTitle}">
                 <div class="card-row-top">
                     <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
                         <span class="status-dot ${statusBadgeClass}"></span>
                         <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
                     </div>
-                    ${groupHtml}
+                    ${groupBadgeHtml}
                 </div>
                 <div class="card-row-bottom">
                     <div style="display: flex; align-items: center; gap: 6px;">
@@ -388,10 +399,10 @@ function renderHostCard(node) {
     } else {
         // Ultra-Compact 20px (IP removed for maximum horizontal compactness; visible on hover & click)
         return `
-            <div class="host-card ${statusClass}" onclick="openTimelineModal(${node.id})" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)}) - ${statusText} - ${t("click_timeline_tooltip")}">
+            <div class="host-card ${statusClass}" onclick="${clickAction}" title="${cardTitle}">
                 <span class="status-dot ${statusBadgeClass}"></span>
-                <span class="host-name" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)})">${escapeHtml(node.name)}</span>
-                ${groupHtml}
+                <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
+                ${groupBadgeHtml}
                 <span class="rtt-val">${rttDisplay}</span>
                 ${sparklineHtml}
             </div>
@@ -406,10 +417,11 @@ function renderSparkline30m(records) {
     if (records && records.length > 0) {
         const recent = records.slice(-slotCount);
         recent.forEach(r => {
-            const cls = r.up ? "up" : "down";
+            const cls = r.degraded ? "degraded" : (r.up ? "up" : "down");
             const dateStr = new Date(r.t * 1000).toLocaleTimeString();
-            const rttStr = r.rtt !== null ? `${r.rtt}ms` : t("status_down");
-            slots.push(`<div class="spark-dot ${cls}" title="${dateStr} - ${r.up ? t("status_up") : t("status_down")} (${rttStr})"></div>`);
+            const rttStr = r.rtt !== null ? `${r.rtt}ms` : "❌";
+            const statusLabel = r.degraded ? t("status_partially_up") : (r.up ? t("status_up") : t("status_down"));
+            slots.push(`<div class="spark-dot ${cls}" title="${dateStr} - ${statusLabel} (${rttStr})"></div>`);
         });
         while (slots.length < slotCount) {
             slots.unshift(`<div class="spark-dot empty" title="${t("no_records_window")}"></div>`);
@@ -461,7 +473,7 @@ function renderTimelineData(data) {
     if (records.length > 0) {
         records.forEach(r => {
             const dt = new Date(r.timestamp * 1000).toLocaleString();
-            const rttStr = r.rtt_ms ? `${r.rtt_ms.toFixed(1)}ms` : t("status_down");
+            const rttStr = r.rtt_ms ? `${r.rtt_ms.toFixed(1)}ms` : "❌";
             const cls = r.is_up ? "up" : "down";
             slicesHtml += `<div class="timeline-slice ${cls}" title="${dt} - ${r.is_up ? t("status_up") : t("status_down")} (${rttStr})"></div>`;
         });
@@ -558,6 +570,113 @@ function renderTimelineData(data) {
 
 function closeTimelineModal() {
     document.getElementById("timeline-modal").classList.remove("active");
+}
+
+// ----------------- Group Details Modal -----------------
+
+async function openGroupModal(encodedGroupName) {
+    const groupName = decodeURIComponent(encodedGroupName);
+    const modal = document.getElementById("timeline-modal");
+    modal.classList.add("active");
+
+    document.getElementById("timeline-host-title").innerText = `👥 ${groupName}`;
+
+    const contentDiv = document.getElementById("timeline-modal-content");
+    contentDiv.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--text-dim);">
+            <div class="spinner"></div> ${t("loading_hierarchy")}
+        </div>
+    `;
+
+    try {
+        const res = await fetch(`/api/groups/${encodeURIComponent(groupName)}/timeline`);
+        if (!res.ok) throw new Error("Group not found");
+        const data = await res.json();
+        renderGroupModalData(data.group);
+    } catch (err) {
+        contentDiv.innerHTML = `<div style="color: var(--down-color); text-align: center; padding: 20px;">${t("login_error_network")}</div>`;
+    }
+}
+
+function renderGroupModalData(group) {
+    let statusBadge = "";
+    if (group.is_degraded) {
+        statusBadge = `<span style="background: rgba(245, 158, 11, 0.25); border: 1px solid rgba(245, 158, 11, 0.7); color: #fbbf24; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 700;">⚠️ ${t("status_partially_up")} (${group.hosts_up}/${group.hosts_total})</span>`;
+    } else if (group.is_up === true) {
+        statusBadge = `<span style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.6); color: #34d399; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 700;">● ${t("status_up")} (${group.hosts_up}/${group.hosts_total})</span>`;
+    } else if (group.is_up === false) {
+        statusBadge = `<span style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.6); color: #f87171; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 700;">● ${t("status_down")} (0/${group.hosts_total})</span>`;
+    } else {
+        statusBadge = `<span style="background: rgba(100, 116, 139, 0.2); color: #94a3b8; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem;">● ${t("status_unknown")}</span>`;
+    }
+
+    const modeText = group.aggregation_mode === "all" ? t("mode_all") : t("mode_any");
+
+    let membersRowsHtml = "";
+    if (group.members && group.members.length > 0) {
+        membersRowsHtml = group.members.map(m => {
+            let mStatus = "";
+            let mRtt = "—";
+            if (m.is_up === true) {
+                mStatus = `<span style="color: var(--up-color); font-weight: 600;">● ${t("status_up")}</span>`;
+                mRtt = m.rtt_ms !== null && m.rtt_ms !== undefined ? `${m.rtt_ms.toFixed(1)}ms` : "—";
+            } else if (m.is_up === false) {
+                mStatus = `<span style="color: var(--down-color); font-weight: 600;">● ${t("status_down")}</span>`;
+                mRtt = `<span class="timeout-emoji" style="font-size: 1rem;" title="${t("status_timeout")}">❌</span>`;
+            } else {
+                mStatus = `<span style="color: var(--unpolled-color);">● ${t("status_unknown")}</span>`;
+            }
+
+            return `
+                <tr>
+                    <td style="font-weight: 600; color: #fff;">${escapeHtml(m.name)}</td>
+                    <td style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(m.ip_address)}</td>
+                    <td style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(m.location)}</td>
+                    <td>${mStatus}</td>
+                    <td style="font-family: var(--font-mono); font-size: 0.85rem;">${mRtt}</td>
+                    <td>
+                        <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openTimelineModal(${m.id})">
+                            📊 ${t("btn_view_timeline")}
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } else {
+        membersRowsHtml = `<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 16px;">${t("no_hosts_desc")}</td></tr>`;
+    }
+
+    const contentDiv = document.getElementById("timeline-modal-content");
+    contentDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                ${statusBadge}
+                <span style="font-size: 0.85rem; color: var(--text-muted);">
+                    <strong>${t("aggregation_mode_label")}</strong> ${modeText}
+                </span>
+            </div>
+        </div>
+        ${group.description ? `<div style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 16px;">${escapeHtml(group.description)}</div>` : ""}
+
+        <div style="margin-top: 10px;">
+            <h4 style="font-size: 0.95rem; margin-bottom: 8px; color: var(--text-main);">${t("member_hosts_title")} (${group.hosts_total})</h4>
+            <table class="incident-table">
+                <thead>
+                    <tr>
+                        <th>${t("th_host_name")}</th>
+                        <th>${t("th_ip_target")}</th>
+                        <th>${t("th_location")}</th>
+                        <th>${t("th_status")}</th>
+                        <th>${t("th_latency")}</th>
+                        <th>${t("th_actions")}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${membersRowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 // ----------------- Force Poll -----------------
