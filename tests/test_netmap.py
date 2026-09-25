@@ -130,3 +130,49 @@ async def test_ping_engine_execution():
         async with db.execute("SELECT COUNT(*) as c FROM ping_history") as cur:
             hist_count = (await cur.fetchone())["c"]
             assert hist_count >= 1
+
+@pytest.mark.asyncio
+async def test_csv_import_with_purge():
+    # 1. Initial import of 10 sample hosts
+    res1 = await import_hosts_from_csv(SAMPLE_CSV_CONTENT, purge_existing=False)
+    assert res1["success"] is True
+    assert res1["imported"] == 10
+
+    # Poll to generate history
+    engine = PingEngine()
+    await engine.execute_poll()
+
+    async with get_hosts_db() as db:
+        async with db.execute("SELECT COUNT(*) as c FROM hosts") as cur:
+            assert (await cur.fetchone())["c"] == 10
+        async with db.execute("SELECT COUNT(*) as c FROM users") as cur:
+            user_count = (await cur.fetchone())["c"]
+            assert user_count >= 1
+
+    async with get_history_db() as hdb:
+        async with hdb.execute("SELECT COUNT(*) as c FROM ping_history") as cur:
+            assert (await cur.fetchone())["c"] >= 10
+
+    # 2. Import replacement CSV with purge_existing=True
+    replacement_csv = """name,ip_address,location,parent,grouping,group_mode,description
+New-Core-Router,127.0.0.1,New-DC,,,any,Only device after purge
+"""
+    res2 = await import_hosts_from_csv(replacement_csv, purge_existing=True)
+    assert res2["success"] is True
+    assert res2["imported"] == 1
+
+    # 3. Verify old hosts and old history purged, only new host exists
+    async with get_hosts_db() as db:
+        async with db.execute("SELECT COUNT(*) as c FROM hosts") as cur:
+            assert (await cur.fetchone())["c"] == 1
+        async with db.execute("SELECT name FROM hosts") as cur:
+            assert (await cur.fetchone())["name"] == "New-Core-Router"
+        # Verify users table was preserved!
+        async with db.execute("SELECT COUNT(*) as c FROM users") as cur:
+            assert (await cur.fetchone())["c"] == user_count
+
+    # Verify history was wiped
+    async with get_history_db() as hdb:
+        async with hdb.execute("SELECT COUNT(*) as c FROM ping_history") as cur:
+            assert (await cur.fetchone())["c"] == 0
+

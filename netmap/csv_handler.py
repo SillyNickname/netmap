@@ -19,7 +19,7 @@ NY-Switch-1,10.0.0.2,New York Branch,Edge-Router-NY,,,Branch Switch
 NY-FileServer,10.0.0.15,New York Branch,NY-Switch-1,,,Branch Storage
 """
 
-async def import_hosts_from_csv(csv_text: str) -> Dict[str, Any]:
+async def import_hosts_from_csv(csv_text: str, purge_existing: bool = False) -> Dict[str, Any]:
     f = io.StringIO(csv_text.strip())
     reader = csv.DictReader(f)
     
@@ -75,6 +75,20 @@ async def import_hosts_from_csv(csv_text: str) -> Dict[str, Any]:
 
     if not rows and errors:
         return {"success": False, "imported": 0, "errors": errors}
+
+    # If purge requested, wipe hosts, groups, and ping history (preserving users & sessions)
+    if purge_existing:
+        from netmap.db import get_history_db
+        from netmap.ping_engine import ping_engine
+        async with get_hosts_db() as db:
+            await db.execute("DELETE FROM hosts;")
+            await db.execute("DELETE FROM groups;")
+            await db.commit()
+        async with get_history_db() as hdb:
+            await hdb.execute("DELETE FROM ping_history;")
+            await hdb.commit()
+        ping_engine.latest_host_status.clear()
+        ping_engine.latest_group_status.clear()
 
     imported_count = 0
     async with get_hosts_db() as db:

@@ -183,6 +183,16 @@
                         <div class="form-group">
                             <label class="form-label" data-i18n="csv_paste_direct">Ou Cole o Conteúdo CSV Diretamente</label>
                             <textarea id="csv-raw-text" class="form-control" rows="8" placeholder="name,ip_address,location,parent,grouping,group_mode,description&#10;Core-Router,192.168.1.1,HQ,,,any,Gateway"></textarea>
+                        <div class="form-group" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 10px 12px; margin-top: 10px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="csv-purge-checkbox" style="width: 16px; height: 16px; cursor: pointer;">
+                                <label for="csv-purge-checkbox" style="font-weight: 600; font-size: 0.85rem; color: #fca5a5; cursor: pointer; margin-bottom: 0;" data-i18n="csv_purge_label">
+                                    Purgar banco de dados antes de importar (substituição completa)
+                                </label>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; padding-left: 24px;" data-i18n="csv_purge_warning">
+                                ⚠️ Se marcado, todos os dispositivos e históricos atuais serão apagados permanentemente antes da importação. As contas de usuários serão preservadas.
+                            </div>
                         </div>
                         <button type="submit" id="btn-csv-import" class="btn btn-primary" style="margin-top: 8px;">
                             <span data-i18n="btn_upload_csv">🚀 Enviar & Importar Dispositivos</span>

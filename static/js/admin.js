@@ -377,6 +377,14 @@ async function handleCsvUpload(e) {
     e.preventDefault();
     const fileInput = document.getElementById("csv-file-input");
     const rawText = document.getElementById("csv-raw-text").value.trim();
+    const purgeCheckbox = document.getElementById("csv-purge-checkbox");
+    const purgeExisting = purgeCheckbox ? purgeCheckbox.checked : false;
+
+    if (purgeExisting) {
+        if (!confirm(t("csv_purge_confirm"))) {
+            return;
+        }
+    }
 
     const formData = new FormData();
     if (fileInput.files.length > 0) {
@@ -387,6 +395,8 @@ async function handleCsvUpload(e) {
         showToast("Please select a file or paste CSV text.", "error");
         return;
     }
+
+    formData.append("purge_existing", purgeExisting ? "true" : "false");
 
     const btn = document.getElementById("btn-csv-import");
     const origHtml = btn.innerHTML;
@@ -400,7 +410,9 @@ async function handleCsvUpload(e) {
         });
         const data = await res.json();
         if (res.ok && data.success) {
-            let msg = `Successfully imported ${data.imported} hosts!`;
+            let msg = purgeExisting 
+                ? t("csv_purge_success").replace("{count}", data.imported)
+                : `Successfully imported ${data.imported} hosts!`;
             if (data.errors && data.errors.length > 0) {
                 msg += ` (${data.errors.length} warnings/skipped)`;
             }
@@ -408,6 +420,7 @@ async function handleCsvUpload(e) {
             document.getElementById("csv-import-form").reset();
             await loadHosts();
             await loadGroups();
+            await loadStats();
         } else {
             showToast(data.detail || (data.errors ? data.errors.join("; ") : "Import failed"), "error");
         }

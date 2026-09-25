@@ -266,7 +266,11 @@ async def delete_user(user_id: int, admin_user: dict = Depends(require_admin)):
 # ----------------- CSV IMPORT & EXPORT -----------------
 
 @router.post("/csv/import")
-async def import_csv_file(file: Optional[UploadFile] = File(None), csv_text: Optional[str] = Form(None)):
+async def import_csv_file(
+    file: Optional[UploadFile] = File(None),
+    csv_text: Optional[str] = Form(None),
+    purge_existing: bool = Form(False)
+):
     content = ""
     if file:
         content_bytes = await file.read()
@@ -277,7 +281,7 @@ async def import_csv_file(file: Optional[UploadFile] = File(None), csv_text: Opt
         raise HTTPException(status_code=400, detail="No CSV file or text provided")
 
     try:
-        result = await import_hosts_from_csv(content)
+        result = await import_hosts_from_csv(content, purge_existing=purge_existing)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
