@@ -386,12 +386,11 @@ function renderHostCard(node) {
             </div>
         `;
     } else {
-        // Ultra-Compact 20px
+        // Ultra-Compact 20px (IP removed for maximum horizontal compactness; visible on hover & click)
         return `
             <div class="host-card ${statusClass}" onclick="openTimelineModal(${node.id})" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)}) - ${statusText} - ${t("click_timeline_tooltip")}">
                 <span class="status-dot ${statusBadgeClass}"></span>
-                <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
-                <span class="ip-badge">${escapeHtml(node.ip_address)}</span>
+                <span class="host-name" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)})">${escapeHtml(node.name)}</span>
                 ${groupHtml}
                 <span class="rtt-val">${rttDisplay}</span>
                 ${sparklineHtml}
@@ -401,7 +400,7 @@ function renderHostCard(node) {
 }
 
 function renderSparkline30m(records) {
-    const slotCount = currentDensity === "tall" ? 20 : 16;
+    const slotCount = currentDensity === "tall" ? 20 : 8;
     let slots = [];
     
     if (records && records.length > 0) {

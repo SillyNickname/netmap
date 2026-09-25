@@ -417,8 +417,8 @@ body {
   align-items: center;
   gap: 1px;
   height: 8px;
-  width: 64px;
-  min-width: 64px;
+  width: 36px;
+  min-width: 36px;
   background: rgba(0, 0, 0, 0.4);
   border-radius: 2px;
   padding: 1px;
