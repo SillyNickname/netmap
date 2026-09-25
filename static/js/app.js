@@ -312,44 +312,38 @@ function renderHostCard(node) {
     let groupHtml = "";
     if (node.grouping) {
         let grpStatus = node.group_status;
-        let grpBadgeStyle = "";
-        let grpInfo = `${escapeHtml(node.grouping)} (${node.group_mode})`;
+        let grpInfo = `${escapeHtml(node.grouping)}`;
         if (grpStatus && grpStatus.is_degraded) {
             statusClass = "status-degraded";
-            grpInfo += ` [Degraded: ${grpStatus.hosts_up}/${grpStatus.hosts_total}]`;
+            grpInfo += ` (${grpStatus.hosts_up}/${grpStatus.hosts_total})`;
         }
-        groupHtml = `<span class="group-badge" title="Group Aggregation: ${node.group_mode}">${grpInfo}</span>`;
+        groupHtml = `<span class="group-badge" title="Group: ${escapeHtml(node.grouping)} (${node.group_mode})">${grpInfo}</span>`;
     }
 
     let rttDisplay = "—";
     if (node.rtt_ms !== null && node.rtt_ms !== undefined) {
-        rttDisplay = `${node.rtt_ms.toFixed(1)} ms`;
+        rttDisplay = `${node.rtt_ms.toFixed(1)}ms`;
     } else if (node.is_up === false) {
-        rttDisplay = "Timeout";
+        rttDisplay = "Down";
     }
 
-    // Abbreviated 30-minute sparkline
+    // Abbreviated 30-minute sparkline without label line
     let sparklineHtml = renderSparkline30m(node.sparkline_30m);
 
     return `
-        <div class="host-card ${statusClass}" onclick="openTimelineModal(${node.id})">
-            <div class="card-top">
-                <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
-                <span class="status-indicator ${statusBadgeClass}">${statusText}</span>
-            </div>
-            <div class="card-meta">
-                <span class="ip-badge">${escapeHtml(node.ip_address)}</span>
-                <span class="rtt-val">${rttDisplay}</span>
-            </div>
-            ${groupHtml ? `<div style="margin-top: 2px;">${groupHtml}</div>` : ""}
+        <div class="host-card ${statusClass}" onclick="openTimelineModal(${node.id})" title="${escapeHtml(node.name)} (${escapeHtml(node.ip_address)}) - ${statusText} - Click for 24h timeline">
+            <span class="status-dot ${statusBadgeClass}"></span>
+            <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
+            <span class="ip-badge">${escapeHtml(node.ip_address)}</span>
+            ${groupHtml}
+            <span class="rtt-val">${rttDisplay}</span>
             ${sparklineHtml}
         </div>
     `;
 }
 
 function renderSparkline30m(records) {
-    // Generate mini 30-slot sparkline
-    const slotCount = 20; // 20 compact slices representing recent checks
+    const slotCount = 16;
     let slots = [];
     
     if (records && records.length > 0) {
@@ -360,7 +354,6 @@ function renderSparkline30m(records) {
             const rttStr = r.rtt !== null ? `${r.rtt}ms` : "Down";
             slots.push(`<div class="spark-dot ${cls}" title="${dateStr} - ${r.up ? 'UP' : 'DOWN'} (${rttStr})"></div>`);
         });
-        // Pad left if fewer records than slotCount
         while (slots.length < slotCount) {
             slots.unshift(`<div class="spark-dot empty" title="No check data"></div>`);
         }
@@ -370,17 +363,7 @@ function renderSparkline30m(records) {
         }
     }
 
-    return `
-        <div class="sparkline-30m-container">
-            <div class="sparkline-label">
-                <span>30m History</span>
-                <span>Click for timeline</span>
-            </div>
-            <div class="sparkline-bar">
-                ${slots.join("")}
-            </div>
-        </div>
-    `;
+    return `<div class="sparkline-bar">${slots.join("")}</div>`;
 }
 
 // ----------------- Host Timeline Modal -----------------
