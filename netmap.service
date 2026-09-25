@@ -1,0 +1,22 @@
+[Unit]
+Description=NetMap - Network Tree Status Monitor
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/netmap
+ExecStart=/opt/netmap/.venv/bin/python3 /opt/netmap/run.py
+Restart=always
+RestartSec=5s
+
+# Security & resource allowances
+LimitNOFILE=65536
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=netmap
+
+[Install]
+WantedBy=multi-user.target

@@ -47,6 +47,20 @@ uvicorn netmap.main:app --host 0.0.0.0 --port 8080
 
 ---
 
+## 📦 Ubuntu Server Deployment (Production)
+
+For automated deployment on **Ubuntu Server** without Docker, run the zero-configuration installer:
+
+```bash
+sudo ./install.sh
+```
+
+This automated script uses Ubuntu's native `apt` package manager to install system dependencies (`python3`, `python3-pip`, `python3-venv`, `iputils-ping`), builds an isolated virtual environment with `pip`, and registers a background daemon service (`netmap.service`) via `systemd` with automatic restart on boot.
+
+For detailed manual instructions, Nginx reverse proxy configurations, and firewall rules, see [DEPLOYMENT.md](file:///home/kajita/git/netmap/DEPLOYMENT.md).
+
+---
+
 ## 🔐 Default Credentials
 
 | Username | Password | Role | Permissions |
