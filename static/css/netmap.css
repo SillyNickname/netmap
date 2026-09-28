@@ -663,6 +663,7 @@ body {
 }
 .timeline-slice.up { background-color: var(--up-color); }
 .timeline-slice.down { background-color: var(--down-color); }
+.timeline-slice.degraded { background-color: var(--degraded-color); }
 
 .incident-table {
   width: 100%;

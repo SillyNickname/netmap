@@ -419,8 +419,11 @@ function renderSparkline30m(records) {
         recent.forEach(r => {
             const cls = r.degraded ? "degraded" : (r.up ? "up" : "down");
             const dateStr = new Date(r.t * 1000).toLocaleTimeString();
-            const rttStr = r.rtt !== null ? `${r.rtt}ms` : "❌";
-            const statusLabel = r.degraded ? t("status_partially_up") : (r.up ? t("status_up") : t("status_down"));
+            const rttStr = (r.rtt !== null && r.rtt !== undefined) ? `${r.rtt}ms` : "❌";
+            let statusLabel = r.degraded ? t("status_partially_up") : (r.up ? t("status_up") : t("status_down"));
+            if (r.hosts_total && r.hosts_total > 1) {
+                statusLabel += ` (${r.hosts_up}/${r.hosts_total})`;
+            }
             slots.push(`<div class="spark-dot ${cls}" title="${dateStr} - ${statusLabel} (${rttStr})"></div>`);
         });
         while (slots.length < slotCount) {

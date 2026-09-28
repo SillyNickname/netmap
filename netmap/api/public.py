@@ -156,34 +156,59 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
         mode = groups.get(grp_name, {}).get("aggregation_mode", "any")
 
         # Combine sparkline of members:
-        # Group time records by timestamp
-        combined_sparkline_map = {}
+        # Cluster member data points into polling rounds so that there is exactly ONE square per round of polling,
+        # with state and color determined by the average availability of members in that round.
+        all_member_points = []
         for m in members:
             for pt in sparklines_30m.get(m["id"], []):
-                t_val = pt["t"]
-                if t_val not in combined_sparkline_map:
-                    combined_sparkline_map[t_val] = {"up_count": 0, "total": 0, "rtt_sum": 0.0, "rtt_num": 0}
-                entry = combined_sparkline_map[t_val]
-                entry["total"] += 1
-                if pt["up"]:
-                    entry["up_count"] += 1
-                    if pt.get("rtt") is not None:
-                        entry["rtt_sum"] += pt["rtt"]
-                        entry["rtt_num"] += 1
+                all_member_points.append({
+                    "t": pt["t"],
+                    "host_id": m["id"],
+                    "up": pt["up"],
+                    "rtt": pt.get("rtt")
+                })
+        all_member_points.sort(key=lambda x: x["t"])
+
+        rounds = []
+        for pt in all_member_points:
+            if rounds and (pt["t"] - rounds[-1]["start_t"] <= 20) and (pt["host_id"] not in rounds[-1]["hosts"]):
+                rounds[-1]["hosts"][pt["host_id"]] = pt
+                rounds[-1]["t"] = max(rounds[-1]["t"], pt["t"])
+            else:
+                rounds.append({
+                    "start_t": pt["t"],
+                    "t": pt["t"],
+                    "hosts": {pt["host_id"]: pt}
+                })
 
         combined_sparkline = []
-        for t_val in sorted(combined_sparkline_map.keys()):
-            entry = combined_sparkline_map[t_val]
-            t_up = entry["up_count"]
-            t_tot = entry["total"]
-            pt_deg = (0 < t_up < t_tot)
-            pt_up = (t_up > 0)
-            pt_rtt = round(entry["rtt_sum"] / entry["rtt_num"], 1) if entry["rtt_num"] > 0 else None
+        for r in rounds:
+            tot = max(total_count, len(r["hosts"]))
+            up_cnt = sum(1 for p in r["hosts"].values() if p["up"])
+            avg_up = up_cnt / tot if tot > 0 else 0.0
+
+            # Determine state/color using the average:
+            # avg == 1.0 (100% up) -> Green
+            # avg == 0.0 (0% up) -> Red
+            # 0.0 < avg < 1.0 (partially up) -> Yellow (Degraded)
+            if avg_up == 1.0:
+                pt_up, pt_deg = True, False
+            elif avg_up == 0.0:
+                pt_up, pt_deg = False, False
+            else:
+                pt_up, pt_deg = True, True
+
+            rtts = [p["rtt"] for p in r["hosts"].values() if p.get("rtt") is not None]
+            avg_round_rtt = round(sum(rtts) / len(rtts), 1) if rtts else None
+
             combined_sparkline.append({
-                "t": t_val,
+                "t": r["t"],
                 "up": pt_up,
                 "degraded": pt_deg,
-                "rtt": pt_rtt
+                "avg": round(avg_up, 2),
+                "hosts_up": up_cnt,
+                "hosts_total": tot,
+                "rtt": avg_round_rtt
             })
 
         tree_nodes[node_id] = {

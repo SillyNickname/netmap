@@ -120,8 +120,10 @@ class PingEngine:
                 results: List[PingResult] = await asyncio.gather(*tasks)
 
                 now_ts = int(time.time())
+                for res in results:
+                    res.timestamp = now_ts
                 history_rows = [
-                    (res.host_id, res.timestamp, 1 if res.is_up else 0, res.rtt_ms, res.error_msg)
+                    (res.host_id, now_ts, 1 if res.is_up else 0, res.rtt_ms, res.error_msg)
                     for res in results
                 ]
                 async with get_history_db() as hist_db:

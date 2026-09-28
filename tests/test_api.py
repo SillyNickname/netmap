@@ -220,3 +220,66 @@ async def test_grouping_consolidation_and_degraded_state():
         assert group_node3["is_up"] is False
         assert group_node3["hosts_up"] == 0
 
+@pytest.mark.asyncio
+async def test_group_sparkline_one_square_per_round_using_average():
+    from netmap.db import get_history_db
+    import time
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+
+        # Create group and 2 hosts
+        await client.post("/api/admin/groups", json={"name": "Cluster-App", "aggregation_mode": "any"})
+        h1 = (await client.post("/api/admin/hosts", json={"name": "app-1", "ip_address": "10.0.0.1", "location": "DC-Main", "grouping": "Cluster-App"})).json()["id"]
+        h2 = (await client.post("/api/admin/hosts", json={"name": "app-2", "ip_address": "10.0.0.2", "location": "DC-Main", "grouping": "Cluster-App"})).json()["id"]
+
+        now = int(time.time())
+        # Round 1: Both hosts UP (timestamps differ by 1s: now - 300, now - 299)
+        # Round 2: 1 host UP, 1 host DOWN (timestamps differ by 2s: now - 200, now - 198) -> Average = 0.5 (Yellow)
+        # Round 3: Both hosts DOWN (timestamps: now - 100, now - 100) -> Average = 0.0 (Red)
+        history_entries = [
+            (h1, now - 300, 1, 2.5, None),
+            (h2, now - 299, 1, 3.0, None),
+            (h1, now - 200, 1, 2.0, None),
+            (h2, now - 198, 0, None, "Timeout"),
+            (h1, now - 100, 0, None, "Timeout"),
+            (h2, now - 100, 0, None, "Timeout"),
+        ]
+        async with get_history_db() as db:
+            await db.executemany(
+                "INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms, error_msg) VALUES (?, ?, ?, ?, ?)",
+                history_entries
+            )
+            await db.commit()
+
+        tree_res = await client.get("/api/tree")
+        assert tree_res.status_code == 200
+        tree = tree_res.json()
+        loc = next(l for l in tree["locations"] if l["name"] == "DC-Main")
+        grp = loc["roots"][0]
+
+        # Verify: Exactly 3 squares for the 3 polling rounds (NOT 6 squares!)
+        sparkline = grp["sparkline_30m"]
+        assert len(sparkline) == 3, f"Expected exactly 3 squares (1 per round), got {len(sparkline)}"
+
+        # Round 1: Both UP -> Green square
+        assert sparkline[0]["up"] is True
+        assert sparkline[0]["degraded"] is False
+        assert sparkline[0]["hosts_up"] == 2
+        assert sparkline[0]["hosts_total"] == 2
+
+        # Round 2: 1 UP, 1 DOWN -> Yellow square (degraded, average = 0.5)
+        assert sparkline[1]["up"] is True
+        assert sparkline[1]["degraded"] is True
+        assert sparkline[1]["avg"] == 0.5
+        assert sparkline[1]["hosts_up"] == 1
+        assert sparkline[1]["hosts_total"] == 2
+
+        # Round 3: Both DOWN -> Red square (down, average = 0.0)
+        assert sparkline[2]["up"] is False
+        assert sparkline[2]["degraded"] is False
+        assert sparkline[2]["avg"] == 0.0
+        assert sparkline[2]["hosts_up"] == 0
+        assert sparkline[2]["hosts_total"] == 2
+
