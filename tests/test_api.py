@@ -301,12 +301,24 @@ async def test_reverse_proxy_subpath_support():
         assert 'src="/netmap/static/js/app.js"' in proxied_res.text
         assert 'href="/netmap/" class="brand"' in proxied_res.text
 
-        # 3. Behind proxy with X-Forwarded-Prefix: /netmap (unstripped subpath)
+        # 3. Behind proxy with X-Forwarded-Prefix: /netmap (stripped static asset requests from Nginx)
+        static_app_js = await client.get("/static/js/app.js", headers={"X-Forwarded-Prefix": "/netmap"})
+        assert static_app_js.status_code == 200
+        assert "NETMAP_BASE" in static_app_js.text
+
+        static_i18n_js = await client.get("/static/js/i18n.js", headers={"X-Forwarded-Prefix": "/netmap"})
+        assert static_i18n_js.status_code == 200
+
+        # Unstripped static asset requests
+        static_unstripped = await client.get("/netmap/static/js/app.js", headers={"X-Forwarded-Prefix": "/netmap"})
+        assert static_unstripped.status_code == 200
+
+        # 4. Behind proxy with X-Forwarded-Prefix: /netmap (unstripped subpath)
         subpath_api = await client.get("/netmap/api/status", headers={"X-Forwarded-Prefix": "/netmap"})
         assert subpath_api.status_code == 200
         assert "total_hosts" in subpath_api.json()
 
-        # 4. Trailing slash redirect for exact prefix
+        # 5. Trailing slash redirect for exact prefix
         redir_res = await client.get("/netmap", headers={"X-Forwarded-Prefix": "/netmap"}, follow_redirects=False)
         assert redir_res.status_code == 307
         assert redir_res.headers.get("location") == "/netmap/"

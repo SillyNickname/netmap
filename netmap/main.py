@@ -46,11 +46,9 @@ class ReverseProxyPrefixMiddleware:
                     response = RedirectResponse(url=f"{prefix}/", status_code=307)
                     await response(scope, receive, send)
                     return
-                elif path.startswith(prefix + "/"):
-                    scope["path"] = path[len(prefix):]
-                    scope["root_path"] = prefix
-                else:
-                    scope["root_path"] = prefix
+                scope["root_path"] = prefix
+                if not path.startswith(prefix):
+                    scope["path"] = prefix + (path if path.startswith("/") else "/" + path)
             elif not scope.get("root_path"):
                 scope["root_path"] = ""
 
