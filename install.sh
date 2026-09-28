@@ -58,13 +58,20 @@ fi
 echo -e "\n${BLUE}[1/5] Updating apt repositories and installing system packages...${NC}"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y --no-install-recommends \
+apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
     iputils-ping \
     curl \
     ca-certificates
+
+# Ensure version-specific python3-venv and python3-full are present for Ubuntu/Debian ensurepip support
+PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)
+if [ -n "$PY_VER" ]; then
+    apt-get install -y "python${PY_VER}-venv" 2>/dev/null || true
+fi
+apt-get install -y python3-full 2>/dev/null || true
 
 echo -e "${GREEN}[✓] System packages successfully installed.${NC}"
 
@@ -100,13 +107,46 @@ echo -e "${GREEN}[✓] Files installed at ${INSTALL_DIR}.${NC}"
 
 # 6. Setup Python Virtual Environment and Pip Libraries
 echo -e "\n${BLUE}[3/5] Setting up Python virtual environment and installing libraries...${NC}"
+
+# If .venv exists but python3 or pip is missing, clean it up for a fresh creation
+if [ -d "$INSTALL_DIR/.venv" ] && [ ! -f "$INSTALL_DIR/.venv/bin/python3" ]; then
+    echo -e "${YELLOW}[WARN] Incomplete virtualenv detected. Recreating...${NC}"
+    rm -rf "$INSTALL_DIR/.venv"
+fi
+
+# Create virtualenv if not present
 if [ ! -d "$INSTALL_DIR/.venv" ]; then
-    python3 -m venv "$INSTALL_DIR/.venv"
+    echo -e "${BLUE}[INFO] Creating Python virtual environment at ${INSTALL_DIR}/.venv...${NC}"
+    if ! python3 -m venv "$INSTALL_DIR/.venv"; then
+        echo -e "${YELLOW}[WARN] Standard 'python3 -m venv' encountered an issue. Attempting with --without-pip...${NC}"
+        python3 -m venv --without-pip "$INSTALL_DIR/.venv"
+    fi
+fi
+
+VENV_PY="$INSTALL_DIR/.venv/bin/python3"
+
+# Ensure pip is installed inside the virtualenv
+if ! "$VENV_PY" -m pip --version &>/dev/null; then
+    echo -e "${YELLOW}[INFO] Bootstrapping pip inside virtual environment...${NC}"
+    if ! "$VENV_PY" -m ensurepip --default-pip 2>/dev/null; then
+        echo -e "${YELLOW}[INFO] Downloading get-pip.py to install pip...${NC}"
+        curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+        "$VENV_PY" /tmp/get-pip.py
+        rm -f /tmp/get-pip.py
+    fi
+fi
+
+# Verify pip is available
+if ! "$VENV_PY" -m pip --version &>/dev/null; then
+    echo -e "${RED}[ERROR] Unable to configure pip inside ${INSTALL_DIR}/.venv.${NC}"
+    echo "Please ensure python3-venv and python3-pip are installed on your host system."
+    exit 1
 fi
 
 # Upgrade pip and install required libraries
-"$INSTALL_DIR/.venv/bin/pip" install --upgrade pip
-"$INSTALL_DIR/.venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt"
+echo -e "${BLUE}[INFO] Installing required Python libraries from requirements.txt...${NC}"
+"$VENV_PY" -m pip install --upgrade pip
+"$VENV_PY" -m pip install -r "$INSTALL_DIR/requirements.txt"
 
 echo -e "${GREEN}[✓] Python libraries installed in ${INSTALL_DIR}/.venv.${NC}"
 

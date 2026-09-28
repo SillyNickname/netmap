@@ -42,7 +42,11 @@ Caso prefira executar cada etapa manualmente:
 ### Passo 1: Atualizar o Sistema e Instalar Pacotes com `apt`
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-pip python3-venv iputils-ping curl
+# Instala o Python, pip, módulos de venv e ferramentas de rede:
+sudo apt install -y python3 python3-pip python3-venv python3-full iputils-ping curl
+# Em algumas versões do Ubuntu (ex: 22.04 ou 24.04), garanta o pacote venv da sua versão específica:
+PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+sudo apt install -y "python${PY_VER}-venv"
 ```
 
 ### Passo 2: Copiar os Arquivos para o Diretório de Produção
@@ -52,12 +56,31 @@ sudo cp -r netmap static templates run.py requirements.txt sample_hosts.csv netm
 cd /opt/netmap
 ```
 
-### Passo 3: Criar o Ambiente Virtual e Instalar Bibliotecas com `pip`
+### Passo 3: Criar o Ambiente Virtual e Instalar Bibliotecas
 ```bash
+# Cria o ambiente virtual isolado:
 sudo python3 -m venv /opt/netmap/.venv
-sudo /opt/netmap/.venv/bin/pip install --upgrade pip
-sudo /opt/netmap/.venv/bin/pip install -r /opt/netmap/requirements.txt
+
+# (Caso o pip não venha por padrão no venv do seu Ubuntu, inicialize com ensurepip):
+sudo /opt/netmap/.venv/bin/python3 -m ensurepip --default-pip 2>/dev/null || true
+
+# Instala as bibliotecas do NetMap usando o pip do ambiente virtual:
+sudo /opt/netmap/.venv/bin/python3 -m pip install --upgrade pip
+sudo /opt/netmap/.venv/bin/python3 -m pip install -r /opt/netmap/requirements.txt
 ```
+
+> **💡 Como executar ou testar manualmente no terminal:**
+> Sempre utilize o Python do ambiente virtual para não haver conflito com o Python do sistema operacional:
+> ```bash
+> # Opção A: Executar diretamente com o Python do venv:
+> sudo /opt/netmap/.venv/bin/python3 /opt/netmap/run.py
+>
+> # Opção B: Ativar o venv na sessão do terminal antes de rodar:
+> cd /opt/netmap
+> source .venv/bin/activate
+> python3 run.py
+> ```
+> *(Nota: O script `run.py` também detecta e ativa automaticamente o `.venv` local caso você o execute no diretório do projeto).*
 
 ### Passo 4: Registrar o Serviço no `systemd`
 Crie o arquivo de serviço `/etc/systemd/system/netmap.service`:
