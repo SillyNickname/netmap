@@ -128,16 +128,57 @@ sudo ufw reload
 
 ---
 
-## 🌐 Configuração Opcional com Nginx (Proxy Reverso & HTTPS)
+## 🌐 Configuração com Nginx (Proxy Reverso & HTTPS)
 
-Se desejar disponibilizar o NetMap na porta padrão `80`/`443` com domínio e certificado SSL (Let's Encrypt):
+O NetMap foi desenvolvido para funcionar tanto na raiz de um domínio (`https://netmap.exemplo.com/`) quanto em um **subdiretório compartilhado** (ex: `https://servidor.exemplo.com/netmap/`).
 
-### 1. Instalar o Nginx
-```bash
-sudo apt install -y nginx
+### Cenário A: Executar sob um Subdiretório (ex: `/netmap/`)
+
+Para hospedar o NetMap sob um subcaminho como `https://<hostname>/netmap/` conectado a `http://<host_ip>:8080/`:
+
+Adicione o bloco abaixo dentro do seu bloco `server { ... }` existente no Nginx:
+
+```nginx
+# Redireciona /netmap sem barra para /netmap/
+location = /netmap {
+    return 301 /netmap/;
+}
+
+# Proxy reverso para o NetMap sob /netmap/
+location /netmap/ {
+    # ATENÇÃO: A barra final em http://127.0.0.1:8080/ é fundamental para reescrever a URI
+    proxy_pass http://127.0.0.1:8080/;
+
+    # Cabeçalhos padrão de proxy reverso
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Informa ao NetMap o prefixo do subdiretório
+    proxy_set_header X-Forwarded-Prefix /netmap;
+
+    # Suporte a HTTP/1.1 e WebSockets
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    # Timeouts recomendados para sondagens de longa duração
+    proxy_connect_timeout 60s;
+    proxy_read_timeout 120s;
+}
 ```
 
-### 2. Criar Configuração de Site no Nginx
+> **Como funciona:**
+> 1. O cabeçalho `X-Forwarded-Prefix /netmap` faz com que o NetMap ajuste dinamicamente todos os links de páginas, APIs (`/netmap/api/...`), arquivos estáticos (`/netmap/static/...`), exportação CSV e cookies de autenticação (`Path=/netmap`).
+> 2. Opcionalmente, você também pode configurar `url_prefix = /netmap` no arquivo `netmap.cfg` (ou na aba de Configurações no painel de administração).
+
+---
+
+### Cenário B: Executar na Raiz do Domínio (ex: `netmap.seu-dominio.com`)
+
+Se desejar um domínio ou subdomínio dedicado:
+
 Crie `/etc/nginx/sites-available/netmap`:
 ```nginx
 server {
@@ -145,13 +186,13 @@ server {
     server_name netmap.seu-dominio.com; # ou o IP do servidor
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8080/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Suporte a WebSockets / SSE
+        # Suporte a HTTP/1.1 e WebSockets
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -159,14 +200,14 @@ server {
 }
 ```
 
-### 3. Ativar o Site e Recarregar o Nginx
+### Ativar o Site e Recarregar o Nginx
 ```bash
 sudo ln -s /etc/nginx/sites-available/netmap /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 4. (Opcional) Gerar Certificado SSL Gratuito com Certbot
+### (Opcional) Gerar Certificado SSL Gratuito com Certbot
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d netmap.seu-dominio.com

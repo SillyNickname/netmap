@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from starlette.responses import RedirectResponse
 
 from netmap.config import config
 from netmap.db import init_databases
@@ -22,12 +23,47 @@ async def lifespan(app: FastAPI):
     # Shutdown: Stop ping poller
     ping_engine.stop()
 
+class ReverseProxyPrefixMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            forwarded_prefix = ""
+            for k, v in scope.get("headers", []):
+                if k.lower() == b"x-forwarded-prefix":
+                    forwarded_prefix = v.decode("latin1").strip()
+                    break
+
+            prefix = (forwarded_prefix or config.url_prefix or scope.get("root_path", "")).strip().rstrip("/")
+            if prefix and not prefix.startswith("/"):
+                prefix = "/" + prefix
+
+            path = scope.get("path", "")
+
+            if prefix:
+                if path == prefix:
+                    response = RedirectResponse(url=f"{prefix}/", status_code=307)
+                    await response(scope, receive, send)
+                    return
+                elif path.startswith(prefix + "/"):
+                    scope["path"] = path[len(prefix):]
+                    scope["root_path"] = prefix
+                else:
+                    scope["root_path"] = prefix
+            elif not scope.get("root_path"):
+                scope["root_path"] = ""
+
+        await self.app(scope, receive, send)
+
 app = FastAPI(
     title="NetMap - Network Tree Status Monitor",
     description="Asynchronous parallel network polling and left-to-right widescreen status tree",
     version="1.0.0",
     lifespan=lifespan
 )
+
+app.add_middleware(ReverseProxyPrefixMiddleware)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -39,10 +75,22 @@ app.include_router(public_router)
 app.include_router(poll_router)
 app.include_router(admin_router)
 
+def get_base_path(request: Request) -> str:
+    return request.scope.get("root_path", "").rstrip("/")
+
 @app.get("/", response_class=HTMLResponse)
 async def index_page(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html")
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={"base_path": get_base_path(request)}
+    )
 
 @app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin/", response_class=HTMLResponse)
 async def admin_page(request: Request):
-    return templates.TemplateResponse(request=request, name="admin.html")
+    return templates.TemplateResponse(
+        request=request,
+        name="admin.html",
+        context={"base_path": get_base_path(request)}
+    )

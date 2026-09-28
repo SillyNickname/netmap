@@ -147,6 +147,8 @@ const TRANSLATIONS = {
         "set_retention_label": "Retenção de Histórico (Horas, mín 24h)",
         "set_host_label": "Endereço de Escuta (Bind IP)",
         "set_port_label": "Porta TCP do Servidor",
+        "set_prefix_label": "Prefixo de URL / Subdiretório (Opcional, ex: /netmap)",
+        "set_prefix_hint": "Necessário somente se não usar o cabeçalho X-Forwarded-Prefix no proxy reverso.",
         "btn_save_settings": "💾 Salvar Configurações no netmap.cfg",
         "settings_saved_success": "Configurações salvas no netmap.cfg e aplicadas com sucesso!",
 
@@ -340,6 +342,8 @@ const TRANSLATIONS = {
         "set_retention_label": "History Retention (Hours, min 24h)",
         "set_host_label": "Server Bind Address",
         "set_port_label": "Server TCP Port",
+        "set_prefix_label": "URL Prefix / Subdirectory (Optional, e.g. /netmap)",
+        "set_prefix_hint": "Only required if not passing X-Forwarded-Prefix header in reverse proxy.",
         "btn_save_settings": "💾 Save Configuration to netmap.cfg",
         "settings_saved_success": "Settings successfully saved to netmap.cfg and live engine!",
 

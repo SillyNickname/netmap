@@ -1,4 +1,14 @@
 // NetMap Administrative Interface JS
+const APP_BASE = (function() {
+    if (typeof window.NETMAP_BASE === "string" && window.NETMAP_BASE.length > 0) {
+        return window.NETMAP_BASE.replace(/\/$/, "");
+    }
+    let p = window.location.pathname || "";
+    p = p.replace(/\/admin(\/.*)?$/, "");
+    p = p.replace(/\/$/, "");
+    return p;
+})();
+
 let currentHosts = [];
 let currentGroups = [];
 let currentUsers = [];
@@ -10,10 +20,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function checkAdminAuth() {
     try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch(`${APP_BASE}/api/auth/me`);
         const data = await res.json();
         if (!data.authenticated || data.user.role !== "admin") {
-            window.location.href = "/?auth_required=true";
+            window.location.href = `${APP_BASE}/?auth_required=true`;
             return;
         }
         document.getElementById("admin-user-display").innerText = data.user.username;
@@ -21,8 +31,18 @@ async function checkAdminAuth() {
         loadAllData();
     } catch (err) {
         console.error("Auth check failed:", err);
-        window.location.href = "/";
+        window.location.href = `${APP_BASE}/`;
     }
+}
+
+async function handleLogout(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    try {
+        await fetch(`${APP_BASE}/api/auth/logout`, { method: "POST" });
+    } catch (err) {
+        console.error("Logout failed:", err);
+    }
+    window.location.href = `${APP_BASE}/`;
 }
 
 function initAdminTabs() {
@@ -53,7 +73,7 @@ async function loadAllData() {
 
 async function loadHosts() {
     try {
-        const res = await fetch("/api/admin/hosts");
+        const res = await fetch(`${APP_BASE}/api/admin/hosts`);
         const data = await res.json();
         currentHosts = data.hosts || [];
         renderHostsTable();
@@ -155,13 +175,13 @@ async function handleHostSubmit(e) {
     try {
         let res;
         if (editingHostId) {
-            res = await fetch(`/api/admin/hosts/${editingHostId}`, {
+            res = await fetch(`${APP_BASE}/api/admin/hosts/${editingHostId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
         } else {
-            res = await fetch("/api/admin/hosts", {
+            res = await fetch(`${APP_BASE}/api/admin/hosts`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
@@ -187,7 +207,7 @@ async function deleteHost(id, name) {
         return;
     }
     try {
-        const res = await fetch(`/api/admin/hosts/${id}`, { method: "DELETE" });
+        const res = await fetch(`${APP_BASE}/api/admin/hosts/${id}`, { method: "DELETE" });
         const data = await res.json();
         if (res.ok && data.success) {
             showToast(`Deleted '${name}'`, "success");
@@ -204,7 +224,7 @@ async function deleteHost(id, name) {
 
 async function loadGroups() {
     try {
-        const res = await fetch("/api/admin/groups");
+        const res = await fetch(`${APP_BASE}/api/admin/groups`);
         const data = await res.json();
         currentGroups = data.groups || [];
         renderGroupsTable();
@@ -277,13 +297,13 @@ async function handleGroupSubmit(e) {
     try {
         let res;
         if (isEdit) {
-            res = await fetch(`/api/admin/groups/${encodeURIComponent(name)}`, {
+            res = await fetch(`${APP_BASE}/api/admin/groups/${encodeURIComponent(name)}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
         } else {
-            res = await fetch("/api/admin/groups", {
+            res = await fetch(`${APP_BASE}/api/admin/groups`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
@@ -309,7 +329,7 @@ async function deleteGroup(name) {
         return;
     }
     try {
-        const res = await fetch(`/api/admin/groups/${encodeURIComponent(name)}`, { method: "DELETE" });
+        const res = await fetch(`${APP_BASE}/api/admin/groups/${encodeURIComponent(name)}`, { method: "DELETE" });
         const data = await res.json();
         if (res.ok && data.success) {
             showToast(`Deleted group '${name}'`, "success");
@@ -327,7 +347,7 @@ async function deleteGroup(name) {
 
 async function loadSettings() {
     try {
-        const res = await fetch("/api/admin/settings");
+        const res = await fetch(`${APP_BASE}/api/admin/settings`);
         const data = await res.json();
         
         document.getElementById("set-interval").value = data.interval_seconds;
@@ -337,6 +357,10 @@ async function loadSettings() {
         document.getElementById("set-retention").value = data.retention_hours;
         document.getElementById("set-port").value = data.server_port;
         document.getElementById("set-host").value = data.server_host;
+        const prefixInput = document.getElementById("set-prefix");
+        if (prefixInput) {
+            prefixInput.value = data.url_prefix || "";
+        }
     } catch (err) {
         showToast("Error loading settings", "error");
     }
@@ -351,11 +375,12 @@ async function handleSettingsSubmit(e) {
         ping_count: parseInt(document.getElementById("set-count").value),
         retention_hours: parseInt(document.getElementById("set-retention").value),
         server_port: parseInt(document.getElementById("set-port").value),
-        server_host: document.getElementById("set-host").value.trim()
+        server_host: document.getElementById("set-host").value.trim(),
+        url_prefix: document.getElementById("set-prefix") ? document.getElementById("set-prefix").value.trim() : ""
     };
 
     try {
-        const res = await fetch("/api/admin/settings", {
+        const res = await fetch(`${APP_BASE}/api/admin/settings`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
@@ -404,7 +429,7 @@ async function handleCsvUpload(e) {
     btn.innerHTML = `<span class="spinner"></span> Importing...`;
 
     try {
-        const res = await fetch("/api/admin/csv/import", {
+        const res = await fetch(`${APP_BASE}/api/admin/csv/import`, {
             method: "POST",
             body: formData
         });
@@ -436,7 +461,7 @@ async function handleCsvUpload(e) {
 
 async function loadUsers() {
     try {
-        const res = await fetch("/api/admin/users");
+        const res = await fetch(`${APP_BASE}/api/admin/users`);
         const data = await res.json();
         currentUsers = data.users || [];
         renderUsersTable();
@@ -472,7 +497,7 @@ async function handleUserCreate(e) {
     const role = document.getElementById("new-user-role").value;
 
     try {
-        const res = await fetch("/api/admin/users", {
+        const res = await fetch(`${APP_BASE}/api/admin/users`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username: user, password: pass, role: role })
@@ -493,7 +518,7 @@ async function handleUserCreate(e) {
 async function deleteUser(id, username) {
     if (!confirm(`${t("confirm_delete_user")} '${username}'?`)) return;
     try {
-        const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+        const res = await fetch(`${APP_BASE}/api/admin/users/${id}`, { method: "DELETE" });
         const data = await res.json();
         if (res.ok && data.success) {
             showToast(`Deleted user '${username}'`, "success");
@@ -510,7 +535,7 @@ async function deleteUser(id, username) {
 
 async function loadStats() {
     try {
-        const res = await fetch("/api/admin/maintenance/stats");
+        const res = await fetch(`${APP_BASE}/api/admin/maintenance/stats`);
         const data = await res.json();
 
         document.getElementById("stat-db-hosts").innerText = `${data.hosts_count} ${t("hosts_count_suffix")}`;
@@ -523,7 +548,7 @@ async function loadStats() {
 
 async function triggerManualPrune() {
     try {
-        const res = await fetch("/api/admin/maintenance/prune", { method: "POST" });
+        const res = await fetch(`${APP_BASE}/api/admin/maintenance/prune`, { method: "POST" });
         const data = await res.json();
         if (res.ok && data.success) {
             showToast(data.message, "success");

@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NetMap - Administração</title>
-    <link rel="stylesheet" href="/static/css/netmap.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/css/netmap.css">
+    <script>
+        window.NETMAP_BASE = "{{ base_path }}";
+    </script>
     <style>
         .admin-nav {
             display: flex;
@@ -75,7 +78,7 @@
 
     <!-- Header Navigation -->
     <header class="navbar">
-        <a href="/" class="brand">
+        <a href="{{ base_path }}/" class="brand">
             <div class="brand-icon">🌐</div>
             <span>NetMap</span>
             <span style="font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-weight: 600;" data-i18n="brand_subtitle">Admin</span>
@@ -88,11 +91,11 @@
                 <button id="lang-btn-en" class="lang-btn" onclick="setLanguage('en')">🇺🇸 EN</button>
             </div>
 
-            <a href="/" class="btn btn-outline" style="padding: 5px 12px;" data-i18n="back_to_tree">← Voltar ao Mapa</a>
+            <a href="{{ base_path }}/" class="btn btn-outline" style="padding: 5px 12px;" data-i18n="back_to_tree">← Voltar ao Mapa</a>
             <span style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
                 👤 <span id="admin-user-display">Admin</span>
             </span>
-            <a href="/" onclick="fetch('/api/auth/logout', {method:'POST'});" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" data-i18n="btn_logout">Sair</a>
+            <button onclick="handleLogout(event)" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" data-i18n="btn_logout">Sair</button>
         </div>
     </header>
 
@@ -211,7 +214,7 @@
                             <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="csv_template_desc">
                                 Arquivo CSV de exemplo pré-formatado com cabeçalhos, hierarquia e grupos.
                             </p>
-                            <a href="/api/admin/csv/template" download="netmap_template.csv" class="btn btn-outline" data-i18n="btn_download_template">
+                            <a href="{{ base_path }}/api/admin/csv/template" download="netmap_template.csv" class="btn btn-outline" data-i18n="btn_download_template">
                                 📄 Baixar CSV de Exemplo
                             </a>
                         </div>
@@ -220,7 +223,7 @@
                             <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="csv_export_desc_2">
                                 Exporta todos os dispositivos, grupos e relacionamentos cadastrados.
                             </p>
-                            <a href="/api/admin/csv/export" download="netmap_hosts.csv" class="btn btn-outline" data-i18n="btn_export_db">
+                            <a href="{{ base_path }}/api/admin/csv/export" download="netmap_hosts.csv" class="btn btn-outline" data-i18n="btn_export_db">
                                 💾 Exportar Dispositivos em CSV
                             </a>
                         </div>
@@ -269,6 +272,13 @@
                         <div class="form-group">
                             <label class="form-label" data-i18n="set_port_label">Porta TCP do Servidor</label>
                             <input type="number" id="set-port" class="form-control" min="1" max="65535" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-i18n="set_prefix_label">Prefixo de URL / Subdiretório (Opcional, ex: /netmap)</label>
+                        <input type="text" id="set-prefix" class="form-control" placeholder="ex: /netmap (deixe vazio se raiz)">
+                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;" data-i18n="set_prefix_hint">
+                            Necessário somente se não usar o cabeçalho X-Forwarded-Prefix no proxy reverso.
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary" style="margin-top: 12px;">
@@ -453,7 +463,7 @@
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/js/i18n.js"></script>
-    <script src="/static/js/admin.js"></script>
+    <script src="{{ base_path }}/static/js/i18n.js"></script>
+    <script src="{{ base_path }}/static/js/admin.js"></script>
 </body>
 </html>

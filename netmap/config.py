@@ -23,7 +23,8 @@ class Config:
         self._parser["server"] = {
             "host": "0.0.0.0",
             "port": "8080",
-            "secret_key": "netmap-secret-key-change-in-production"
+            "secret_key": "netmap-secret-key-change-in-production",
+            "url_prefix": ""
         }
         self._parser["poller"] = {
             "interval_seconds": "60",
@@ -41,7 +42,7 @@ class Config:
 
     def _ensure_keys(self) -> None:
         defaults = {
-            "server": {"host": "0.0.0.0", "port": "8080", "secret_key": "netmap-secret-key-change-in-production"},
+            "server": {"host": "0.0.0.0", "port": "8080", "secret_key": "netmap-secret-key-change-in-production", "url_prefix": ""},
             "poller": {"interval_seconds": "60", "ping_threads": "20", "ping_timeout": "2", "ping_count": "1"},
             "history": {"retention_hours": "48"},
             "database": {"hosts_db": "data/hosts.db", "history_db": "data/history.db"}
@@ -74,6 +75,13 @@ class Config:
     @property
     def secret_key(self) -> str:
         return self._parser.get("server", "secret_key", fallback="netmap-secret-key-change-in-production")
+
+    @property
+    def url_prefix(self) -> str:
+        prefix = self._parser.get("server", "url_prefix", fallback="").strip()
+        if prefix and not prefix.startswith("/"):
+            prefix = "/" + prefix
+        return prefix.rstrip("/")
 
     # Poller settings
     @property
@@ -112,6 +120,11 @@ class Config:
             self._parser.set("server", "host", str(updates["server_host"]).strip())
         if "server_port" in updates:
             self._parser.set("server", "port", str(int(updates["server_port"])))
+        if "url_prefix" in updates:
+            raw_prefix = str(updates["url_prefix"]).strip()
+            if raw_prefix and not raw_prefix.startswith("/"):
+                raw_prefix = "/" + raw_prefix
+            self._parser.set("server", "url_prefix", raw_prefix.rstrip("/"))
         if "interval_seconds" in updates:
             val = max(5, int(updates["interval_seconds"]))
             self._parser.set("poller", "interval_seconds", str(val))
@@ -133,6 +146,7 @@ class Config:
         return {
             "server_host": self.server_host,
             "server_port": self.server_port,
+            "url_prefix": self.url_prefix,
             "interval_seconds": self.poller_interval_seconds,
             "ping_threads": self.ping_threads,
             "ping_timeout": self.ping_timeout,

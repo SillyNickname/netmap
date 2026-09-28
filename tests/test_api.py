@@ -283,3 +283,50 @@ async def test_group_sparkline_one_square_per_round_using_average():
         assert sparkline[2]["hosts_up"] == 0
         assert sparkline[2]["hosts_total"] == 2
 
+@pytest.mark.asyncio
+async def test_reverse_proxy_subpath_support():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Standalone root rendering
+        root_res = await client.get("/")
+        assert root_res.status_code == 200
+        assert 'window.NETMAP_BASE = "";' in root_res.text
+        assert 'href="/static/css/netmap.css"' in root_res.text
+
+        # 2. Behind proxy with X-Forwarded-Prefix: /netmap (stripped path)
+        proxied_res = await client.get("/", headers={"X-Forwarded-Prefix": "/netmap"})
+        assert proxied_res.status_code == 200
+        assert 'window.NETMAP_BASE = "/netmap";' in proxied_res.text
+        assert 'href="/netmap/static/css/netmap.css"' in proxied_res.text
+        assert 'src="/netmap/static/js/app.js"' in proxied_res.text
+        assert 'href="/netmap/" class="brand"' in proxied_res.text
+
+        # 3. Behind proxy with X-Forwarded-Prefix: /netmap (unstripped subpath)
+        subpath_api = await client.get("/netmap/api/status", headers={"X-Forwarded-Prefix": "/netmap"})
+        assert subpath_api.status_code == 200
+        assert "total_hosts" in subpath_api.json()
+
+        # 4. Trailing slash redirect for exact prefix
+        redir_res = await client.get("/netmap", headers={"X-Forwarded-Prefix": "/netmap"}, follow_redirects=False)
+        assert redir_res.status_code == 307
+        assert redir_res.headers.get("location") == "/netmap/"
+
+        # 5. Admin page under subpath
+        admin_res = await client.get("/netmap/admin", headers={"X-Forwarded-Prefix": "/netmap"})
+        assert admin_res.status_code == 200
+        assert 'window.NETMAP_BASE = "/netmap";' in admin_res.text
+        assert 'href="/netmap/api/admin/csv/template"' in admin_res.text
+        assert 'href="/netmap/api/admin/csv/export"' in admin_res.text
+
+        # 6. Session cookie scoped to subpath
+        login_res = await client.post(
+            "/netmap/api/auth/login",
+            json={"username": "admin", "password": "admin123"},
+            headers={"X-Forwarded-Prefix": "/netmap", "X-Forwarded-Proto": "https"}
+        )
+        assert login_res.status_code == 200
+        cookie_header = login_res.headers.get("set-cookie", "")
+        assert "Path=/netmap" in cookie_header
+        assert "Secure" in cookie_header
+
+

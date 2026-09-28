@@ -44,6 +44,7 @@ class UserUpdate(BaseModel):
 class SettingsUpdate(BaseModel):
     server_host: Optional[str] = None
     server_port: Optional[int] = Field(None, ge=1, le=65535)
+    url_prefix: Optional[str] = None
     interval_seconds: Optional[int] = Field(None, ge=5, le=86400)
     ping_threads: Optional[int] = Field(None, ge=1, le=500)
     ping_timeout: Optional[int] = Field(None, ge=1, le=30)

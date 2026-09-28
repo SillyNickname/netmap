@@ -6,7 +6,7 @@ from netmap.models import UserLogin
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/login")
-async def login(credentials: UserLogin, response: Response):
+async def login(credentials: UserLogin, request: Request, response: Response):
     async with get_hosts_db() as db:
         async with db.execute(
             "SELECT id, username, password_hash, role FROM users WHERE username = ?",
@@ -21,13 +21,16 @@ async def login(credentials: UserLogin, response: Response):
         )
 
     token = await create_session(user["id"])
+    cookie_path = (request.scope.get("root_path", "").rstrip("/") or "") or "/"
+    is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=token,
         max_age=SESSION_LIFETIME_SECONDS,
         httponly=True,
         samesite="lax",
-        secure=False
+        secure=is_secure,
+        path=cookie_path
     )
     return {
         "success": True,
@@ -50,7 +53,10 @@ async def logout(request: Request, response: Response):
     if token:
         await delete_session(token)
 
-    response.delete_cookie(SESSION_COOKIE_NAME)
+    cookie_path = (request.scope.get("root_path", "").rstrip("/") or "") or "/"
+    response.delete_cookie(SESSION_COOKIE_NAME, path=cookie_path)
+    if cookie_path != "/":
+        response.delete_cookie(SESSION_COOKIE_NAME, path="/")
     return {"success": True, "message": "Logged out successfully"}
 
 @router.get("/me")

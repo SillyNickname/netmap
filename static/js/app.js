@@ -1,4 +1,14 @@
 // NetMap Main Application JS
+const APP_BASE = (function() {
+    if (typeof window.NETMAP_BASE === "string" && window.NETMAP_BASE.length > 0) {
+        return window.NETMAP_BASE.replace(/\/$/, "");
+    }
+    let p = window.location.pathname || "";
+    p = p.replace(/\/admin(\/.*)?$/, "");
+    p = p.replace(/\/$/, "");
+    return p;
+})();
+
 let currentUser = null;
 let currentLocations = [];
 let activeLocationFilter = 'all';
@@ -57,7 +67,7 @@ function setDensity(mode, shouldRerender = true) {
 
 async function initAuth() {
     try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch(`${APP_BASE}/api/auth/me`);
         const data = await res.json();
         if (data.authenticated && data.user) {
             currentUser = data.user;
@@ -78,7 +88,7 @@ function renderAuthUI() {
     if (currentUser) {
         let adminLink = "";
         if (currentUser.role === "admin") {
-            adminLink = `<a href="/admin" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">${t("btn_admin")}</a>`;
+            adminLink = `<a href="${APP_BASE}/admin" class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">${t("btn_admin")}</a>`;
         }
         authContainer.innerHTML = `
             ${adminLink}
@@ -100,7 +110,7 @@ function renderAuthUI() {
 
 async function handleLogout() {
     try {
-        await fetch("/api/auth/logout", { method: "POST" });
+        await fetch(`${APP_BASE}/api/auth/logout`, { method: "POST" });
         currentUser = null;
         renderAuthUI();
         showToast(t("logged_out_success"), "success");
@@ -128,7 +138,7 @@ async function handleLoginSubmit(e) {
     errDiv.innerText = "";
 
     try {
-        const res = await fetch("/api/auth/login", {
+        const res = await fetch(`${APP_BASE}/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username: user, password: pass })
@@ -159,7 +169,7 @@ async function refreshData() {
 
 async function loadStatus() {
     try {
-        const res = await fetch("/api/status");
+        const res = await fetch(`${APP_BASE}/api/status`);
         const data = await res.json();
         
         document.getElementById("stat-total").innerText = data.total_hosts || 0;
@@ -206,8 +216,8 @@ function startCountdown() {
 async function loadTree(renderFilters = true) {
     try {
         const url = activeLocationFilter === 'all' 
-            ? "/api/tree" 
-            : `/api/tree?location_filter=${encodeURIComponent(activeLocationFilter)}`;
+            ? `${APP_BASE}/api/tree` 
+            : `${APP_BASE}/api/tree?location_filter=${encodeURIComponent(activeLocationFilter)}`;
         const res = await fetch(url);
         const data = await res.json();
         
@@ -225,7 +235,7 @@ function renderLocationFilters() {
     const tabsContainer = document.getElementById("location-tabs");
     if (!tabsContainer) return;
 
-    fetch("/api/tree").then(r => r.json()).then(fullData => {
+    fetch(`${APP_BASE}/api/tree`).then(r => r.json()).then(fullData => {
         const locs = fullData.locations || [];
         let html = `
             <button class="pill-tab ${activeLocationFilter === 'all' ? 'active' : ''}" 
@@ -455,7 +465,7 @@ async function openTimelineModal(hostId, hours = 24) {
     `;
 
     try {
-        const res = await fetch(`/api/hosts/${hostId}/timeline?hours=${hours}`);
+        const res = await fetch(`${APP_BASE}/api/hosts/${hostId}/timeline?hours=${hours}`);
         if (!res.ok) throw new Error("Host not found");
         const data = await res.json();
         renderTimelineData(data);
@@ -592,7 +602,7 @@ async function openGroupModal(encodedGroupName) {
     `;
 
     try {
-        const res = await fetch(`/api/groups/${encodeURIComponent(groupName)}/timeline`);
+        const res = await fetch(`${APP_BASE}/api/groups/${encodeURIComponent(groupName)}/timeline`);
         if (!res.ok) throw new Error("Group not found");
         const data = await res.json();
         renderGroupModalData(data.group);
@@ -697,7 +707,7 @@ async function handleForcePoll() {
     btn.innerHTML = `<span class="spinner"></span> ${t("polling_now")}`;
 
     try {
-        const res = await fetch("/api/poll/force", { method: "POST" });
+        const res = await fetch(`${APP_BASE}/api/poll/force`, { method: "POST" });
         const data = await res.json();
         
         if (res.ok && data.success) {
