@@ -407,13 +407,12 @@ function renderHostCard(node) {
             </div>
         `;
     } else {
-        // Ultra-Compact 20px (IP removed for maximum horizontal compactness; visible on hover & click)
+        // Ultra-Compact 20px (IP and latency removed for visual uniformity & compactness; visible on hover & click)
         return `
             <div class="host-card ${statusClass}" onclick="${clickAction}" title="${cardTitle}">
                 <span class="status-dot ${statusBadgeClass}"></span>
                 <span class="host-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
                 ${groupBadgeHtml}
-                <span class="rtt-val">${rttDisplay}</span>
                 ${sparklineHtml}
             </div>
         `;
@@ -421,7 +420,7 @@ function renderHostCard(node) {
 }
 
 function renderSparkline30m(records) {
-    const slotCount = currentDensity === "tall" ? 20 : 8;
+    const slotCount = currentDensity === "tall" ? 20 : 4;
     let slots = [];
     
     if (records && records.length > 0) {

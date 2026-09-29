@@ -314,6 +314,9 @@ body {
   height: 20px;
   max-height: 20px;
   min-height: 20px;
+  width: 160px;
+  min-width: 160px;
+  max-width: 160px;
   box-sizing: border-box;
   padding: 0 8px;
   cursor: pointer;
@@ -382,10 +385,10 @@ body {
   font-weight: 600;
   font-size: 11px;
   color: #fff;
-  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .ip-badge {
@@ -430,19 +433,20 @@ body {
   line-height: 1;
 }
 
-/* 30-Minute Inline Micro Sparkline */
+/* Inline Micro Sparkline */
 .sparkline-bar {
   display: inline-flex;
   align-items: center;
   gap: 1px;
   height: 8px;
-  width: 36px;
-  min-width: 36px;
+  width: 20px;
+  min-width: 20px;
   background: rgba(0, 0, 0, 0.4);
   border-radius: 2px;
   padding: 1px;
   box-sizing: border-box;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .spark-dot {
@@ -493,7 +497,9 @@ body {
   flex-direction: column;
   justify-content: center;
   gap: 4px;
+  width: auto;
   min-width: 260px;
+  max-width: none;
 }
 
 .density-tall .card-row-top {
@@ -515,6 +521,7 @@ body {
 .density-tall .host-name {
   font-size: 12px;
   max-width: 160px;
+  flex-shrink: 0;
 }
 
 .density-tall .ip-badge {
@@ -525,6 +532,7 @@ body {
   height: 10px;
   width: 80px;
   min-width: 80px;
+  margin-left: 0;
 }
 
 .density-tall .spark-dot {
