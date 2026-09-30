@@ -314,9 +314,9 @@ body {
   height: 20px;
   max-height: 20px;
   min-height: 20px;
-  width: 160px;
-  min-width: 160px;
-  max-width: 160px;
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
   box-sizing: border-box;
   padding: 0 8px;
   cursor: pointer;
