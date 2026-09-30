@@ -19,16 +19,26 @@ router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(re
 # ----------------- HOSTS CRUD -----------------
 
 @router.get("/hosts")
-async def list_hosts():
+async def list_hosts(sort: Optional[str] = None, dir: Optional[str] = "asc"):
+    direction = "DESC" if dir and dir.lower() == "desc" else "ASC"
+    order_map = {
+        "name": f"h.name COLLATE NOCASE {direction}",
+        "ip": f"h.ip_address {direction}",
+        "location": f"h.location COLLATE NOCASE {direction}, h.name COLLATE NOCASE {direction}",
+        "parent": f"parent_name COLLATE NOCASE {direction}, h.name COLLATE NOCASE {direction}",
+        "grouping": f"h.grouping COLLATE NOCASE {direction}, h.name COLLATE NOCASE {direction}",
+        "status": f"h.is_active {direction}, h.name COLLATE NOCASE {direction}"
+    }
+    order_clause = order_map.get(sort, "h.location, h.name")
     async with get_hosts_db() as db:
-        query = """
+        query = f"""
             SELECT h.id, h.name, h.ip_address, h.location, h.parent_id, p.name as parent_name,
                    h.grouping, g.aggregation_mode as group_mode, h.description, h.is_active,
                    h.created_at, h.updated_at
             FROM hosts h
             LEFT JOIN hosts p ON h.parent_id = p.id
             LEFT JOIN groups g ON h.grouping = g.name
-            ORDER BY h.location, h.name
+            ORDER BY {order_clause}
         """
         async with db.execute(query) as cursor:
             hosts = [dict(r) for r in await cursor.fetchall()]
@@ -147,14 +157,22 @@ async def delete_host(host_id: int):
 # ----------------- GROUPS CRUD -----------------
 
 @router.get("/groups")
-async def list_groups():
+async def list_groups(sort: Optional[str] = None, dir: Optional[str] = "asc"):
+    direction = "DESC" if dir and dir.lower() == "desc" else "ASC"
+    order_map = {
+        "name": f"g.name COLLATE NOCASE {direction}",
+        "mode": f"g.aggregation_mode {direction}",
+        "hosts": f"host_count {direction}",
+        "description": f"g.description COLLATE NOCASE {direction}"
+    }
+    order_clause = order_map.get(sort, "g.name")
     async with get_hosts_db() as db:
-        query = """
+        query = f"""
             SELECT g.name, g.aggregation_mode, g.description, COUNT(h.id) as host_count
             FROM groups g
             LEFT JOIN hosts h ON h.grouping = g.name AND h.is_active = 1
             GROUP BY g.name
-            ORDER BY g.name
+            ORDER BY {order_clause}
         """
         async with db.execute(query) as cursor:
             groups = [dict(r) for r in await cursor.fetchall()]

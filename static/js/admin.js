@@ -14,6 +14,12 @@ let currentGroups = [];
 let currentUsers = [];
 let editingHostId = null;
 
+let hostSortColumn = localStorage.getItem("netmap_admin_host_sort_col") || "name";
+let hostSortAsc = localStorage.getItem("netmap_admin_host_sort_asc") !== "false";
+
+let groupSortColumn = localStorage.getItem("netmap_admin_group_sort_col") || "name";
+let groupSortAsc = localStorage.getItem("netmap_admin_group_sort_asc") !== "false";
+
 document.addEventListener("DOMContentLoaded", () => {
     checkAdminAuth();
 });
@@ -83,16 +89,133 @@ async function loadHosts() {
     }
 }
 
+function compareIps(ipA, ipB) {
+    if (!ipA && !ipB) return 0;
+    if (!ipA) return 1;
+    if (!ipB) return -1;
+    const partsA = ipA.split(".").map(Number);
+    const partsB = ipB.split(".").map(Number);
+    if (partsA.length === 4 && partsB.length === 4 && partsA.every(n => !isNaN(n)) && partsB.every(n => !isNaN(n))) {
+        for (let i = 0; i < 4; i++) {
+            if (partsA[i] !== partsB[i]) {
+                return partsA[i] - partsB[i];
+            }
+        }
+        return 0;
+    }
+    return ipA.localeCompare(ipB, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function sortHostsList(hosts, column, asc) {
+    return [...hosts].sort((a, b) => {
+        let diff = 0;
+        if (column === "name") {
+            const valA = a.name || "";
+            const valB = b.name || "";
+            diff = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+        } else if (column === "ip") {
+            diff = compareIps(a.ip_address || "", b.ip_address || "");
+        } else if (column === "location") {
+            const valA = a.location || "";
+            const valB = b.location || "";
+            diff = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+            if (diff === 0) {
+                diff = (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+            }
+        } else if (column === "parent") {
+            const valA = a.parent_name || "";
+            const valB = b.parent_name || "";
+            if (!valA && valB) diff = 1;
+            else if (valA && !valB) diff = -1;
+            else diff = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+            if (diff === 0) {
+                diff = (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+            }
+        } else if (column === "grouping") {
+            const valA = a.grouping || "";
+            const valB = b.grouping || "";
+            if (!valA && valB) diff = 1;
+            else if (valA && !valB) diff = -1;
+            else diff = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+            if (diff === 0) {
+                diff = (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+            }
+        } else if (column === "status") {
+            const valA = a.is_active ? 1 : 0;
+            const valB = b.is_active ? 1 : 0;
+            diff = valB - valA;
+            if (diff === 0) {
+                diff = (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+            }
+        }
+        return asc ? diff : -diff;
+    });
+}
+
+function setHostSort(col) {
+    if (hostSortColumn === col) {
+        hostSortAsc = !hostSortAsc;
+    } else {
+        hostSortColumn = col;
+        hostSortAsc = true;
+    }
+    localStorage.setItem("netmap_admin_host_sort_col", hostSortColumn);
+    localStorage.setItem("netmap_admin_host_sort_asc", hostSortAsc);
+    renderHostsTable();
+}
+
+function handleHostSortSelect(col) {
+    hostSortColumn = col;
+    localStorage.setItem("netmap_admin_host_sort_col", hostSortColumn);
+    renderHostsTable();
+}
+
+function toggleHostSortDir() {
+    hostSortAsc = !hostSortAsc;
+    localStorage.setItem("netmap_admin_host_sort_asc", hostSortAsc);
+    renderHostsTable();
+}
+
+function updateHostSortIndicators() {
+    const cols = ["name", "ip", "location", "parent", "grouping", "status"];
+    cols.forEach(col => {
+        const th = document.getElementById(`th-host-${col}`);
+        const icon = document.getElementById(`sort-icon-host-${col}`);
+        if (!th || !icon) return;
+        if (col === hostSortColumn) {
+            th.classList.add("sort-active");
+            icon.innerText = hostSortAsc ? "▲" : "▼";
+        } else {
+            th.classList.remove("sort-active");
+            icon.innerText = "↕";
+        }
+    });
+
+    const select = document.getElementById("hosts-sort-select");
+    if (select) {
+        select.value = hostSortColumn;
+    }
+    const dirBtn = document.getElementById("hosts-sort-dir-btn");
+    if (dirBtn) {
+        dirBtn.innerText = hostSortAsc ? "▲" : "▼";
+        dirBtn.title = hostSortAsc ? t("sort_asc") : t("sort_desc");
+    }
+}
+
 function renderHostsTable() {
     const tbody = document.getElementById("hosts-table-body");
     if (!tbody) return;
+
+    updateHostSortIndicators();
 
     if (currentHosts.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 24px;">${t("no_hosts_title")}</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = currentHosts.map(h => `
+    const sortedHosts = sortHostsList(currentHosts, hostSortColumn, hostSortAsc);
+
+    tbody.innerHTML = sortedHosts.map(h => `
         <tr>
             <td><strong>${escapeHtml(h.name)}</strong></td>
             <td><code>${escapeHtml(h.ip_address)}</code></td>
@@ -234,16 +357,94 @@ async function loadGroups() {
     }
 }
 
+function sortGroupsList(groups, column, asc) {
+    return [...groups].sort((a, b) => {
+        let diff = 0;
+        if (column === "name") {
+            const valA = a.name || "";
+            const valB = b.name || "";
+            diff = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+        } else if (column === "mode") {
+            const valA = a.aggregation_mode || "";
+            const valB = b.aggregation_mode || "";
+            diff = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+        } else if (column === "hosts") {
+            const valA = a.host_count || 0;
+            const valB = b.host_count || 0;
+            diff = valA - valB;
+        } else if (column === "description") {
+            const valA = a.description || "";
+            const valB = b.description || "";
+            diff = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: "base" });
+        }
+        return asc ? diff : -diff;
+    });
+}
+
+function setGroupSort(col) {
+    if (groupSortColumn === col) {
+        groupSortAsc = !groupSortAsc;
+    } else {
+        groupSortColumn = col;
+        groupSortAsc = true;
+    }
+    localStorage.setItem("netmap_admin_group_sort_col", groupSortColumn);
+    localStorage.setItem("netmap_admin_group_sort_asc", groupSortAsc);
+    renderGroupsTable();
+}
+
+function handleGroupSortSelect(col) {
+    groupSortColumn = col;
+    localStorage.setItem("netmap_admin_group_sort_col", groupSortColumn);
+    renderGroupsTable();
+}
+
+function toggleGroupSortDir() {
+    groupSortAsc = !groupSortAsc;
+    localStorage.setItem("netmap_admin_group_sort_asc", groupSortAsc);
+    renderGroupsTable();
+}
+
+function updateGroupSortIndicators() {
+    const cols = ["name", "mode", "hosts", "description"];
+    cols.forEach(col => {
+        const th = document.getElementById(`th-group-${col}`);
+        const icon = document.getElementById(`sort-icon-group-${col}`);
+        if (!th || !icon) return;
+        if (col === groupSortColumn) {
+            th.classList.add("sort-active");
+            icon.innerText = groupSortAsc ? "▲" : "▼";
+        } else {
+            th.classList.remove("sort-active");
+            icon.innerText = "↕";
+        }
+    });
+
+    const select = document.getElementById("groups-sort-select");
+    if (select) {
+        select.value = groupSortColumn;
+    }
+    const dirBtn = document.getElementById("groups-sort-dir-btn");
+    if (dirBtn) {
+        dirBtn.innerText = groupSortAsc ? "▲" : "▼";
+        dirBtn.title = groupSortAsc ? t("sort_asc") : t("sort_desc");
+    }
+}
+
 function renderGroupsTable() {
     const tbody = document.getElementById("groups-table-body");
     if (!tbody) return;
+
+    updateGroupSortIndicators();
 
     if (currentGroups.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 24px;">No groups configured.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = currentGroups.map(g => `
+    const sortedGroups = sortGroupsList(currentGroups, groupSortColumn, groupSortAsc);
+
+    tbody.innerHTML = sortedGroups.map(g => `
         <tr>
             <td><strong>${escapeHtml(g.name)}</strong></td>
             <td>

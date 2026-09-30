@@ -61,7 +61,7 @@
         <div class="filter-group">
             <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);" data-i18n="label_locations">LOCAIS:</span>
             <div id="location-tabs" class="pill-tabs">
-                <button class="pill-tab active" onclick="filterLocation('all')" data-i18n="all_sites">Todos os Locais</button>
+                <a href="{{ base_path }}/" id="loc-tab-all" class="pill-tab active" onclick="event.preventDefault(); filterLocation('all')" data-i18n="all_sites">Todos os Locais</a>
             </div>
         </div>
 

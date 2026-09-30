@@ -198,6 +198,9 @@ body {
   border: none;
   background: transparent;
   transition: all 0.15s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 .pill-tab.active {

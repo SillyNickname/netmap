@@ -341,4 +341,46 @@ async def test_reverse_proxy_subpath_support():
         assert "Path=/netmap" in cookie_header
         assert "Secure" in cookie_header
 
+@pytest.mark.asyncio
+async def test_admin_sorting_and_location_filtering():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        login_res = await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+        assert login_res.status_code == 200
+
+        await client.post("/api/admin/hosts", json={"name": "Host-Z", "ip_address": "10.0.1.20", "location": "Site-B"})
+        await client.post("/api/admin/hosts", json={"name": "Host-A", "ip_address": "10.0.1.2", "location": "Site-A", "grouping": "Grp-1"})
+        await client.post("/api/admin/hosts", json={"name": "Host-M", "ip_address": "10.0.1.10", "location": "Site-C", "grouping": "Grp-2"})
+
+        res_name_asc = await client.get("/api/admin/hosts?sort=name&dir=asc")
+        assert res_name_asc.status_code == 200
+        names_asc = [h["name"] for h in res_name_asc.json()["hosts"]]
+        assert names_asc == ["Host-A", "Host-M", "Host-Z"]
+
+        res_name_desc = await client.get("/api/admin/hosts?sort=name&dir=desc")
+        assert res_name_desc.status_code == 200
+        names_desc = [h["name"] for h in res_name_desc.json()["hosts"]]
+        assert names_desc == ["Host-Z", "Host-M", "Host-A"]
+
+        res_loc_asc = await client.get("/api/admin/hosts?sort=location&dir=asc")
+        assert res_loc_asc.status_code == 200
+        locs_asc = [h["location"] for h in res_loc_asc.json()["hosts"]]
+        assert locs_asc == ["Site-A", "Site-B", "Site-C"]
+
+        res_grp = await client.get("/api/admin/hosts?sort=grouping&dir=asc")
+        assert res_grp.status_code == 200
+
+        res_grp_name = await client.get("/api/admin/groups?sort=name&dir=desc")
+        assert res_grp_name.status_code == 200
+
+        res_tree_loc = await client.get("/api/tree?location_filter=Site-A")
+        assert res_tree_loc.status_code == 200
+        tree_locs = res_tree_loc.json()["locations"]
+        assert len(tree_locs) == 1
+        assert tree_locs[0]["name"] == "Site-A"
+
+        res_index = await client.get("/?location=Site-A")
+        assert res_index.status_code == 200
+        assert "location-tabs" in res_index.text
+
 

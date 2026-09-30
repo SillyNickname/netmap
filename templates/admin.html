@@ -54,6 +54,29 @@
             font-weight: 600;
             background: rgba(0,0,0,0.15);
         }
+        .admin-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .admin-table th.sortable:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .admin-table th .sort-icon {
+            display: inline-block;
+            margin-left: 6px;
+            font-size: 0.75rem;
+            opacity: 0.4;
+            transition: opacity 0.15s ease, color 0.15s ease;
+        }
+        .admin-table th.sort-active {
+            color: #fff;
+        }
+        .admin-table th.sort-active .sort-icon {
+            opacity: 1;
+            color: var(--accent-color);
+        }
         .admin-table tr:hover td {
             background: rgba(255, 255, 255, 0.02);
         }
@@ -113,23 +136,37 @@
         <!-- TAB 1: HOSTS -->
         <section id="tab-hosts" class="admin-tab-panel active">
             <div class="panel-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                     <div>
                         <h2 style="font-size: 1.2rem; color: #fff;" data-i18n="admin_hosts_title">Dispositivos de Rede & Topologia</h2>
                         <p style="font-size: 0.82rem; color: var(--text-dim);" data-i18n="admin_hosts_desc">Gerencie IPs, locais geográficos e a hierarquia pai-filho da topologia.</p>
                     </div>
-                    <button onclick="openAddHostModal()" class="btn btn-primary" data-i18n="btn_add_host">+ Novo Dispositivo</button>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted);">
+                            <span data-i18n="sort_by_label">Ordenar por:</span>
+                            <select id="hosts-sort-select" style="padding: 4px 8px; font-size: 0.82rem; background: var(--bg-subtle); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" onchange="handleHostSortSelect(this.value)">
+                                <option value="name" data-i18n="th_host_name">Nome</option>
+                                <option value="ip" data-i18n="th_ip_target">IP / Host</option>
+                                <option value="location" data-i18n="th_location">Localização (Macro)</option>
+                                <option value="parent" data-i18n="th_parent">Dispositivo Pai (Hierarquia)</option>
+                                <option value="grouping" data-i18n="th_grouping">Agrupamento</option>
+                                <option value="status" data-i18n="th_status">Status</option>
+                            </select>
+                            <button id="hosts-sort-dir-btn" class="btn btn-outline" style="padding: 3px 8px; font-size: 0.78rem;" onclick="toggleHostSortDir()" title="Alternar direção">▲</button>
+                        </div>
+                        <button onclick="openAddHostModal()" class="btn btn-primary" data-i18n="btn_add_host">+ Novo Dispositivo</button>
+                    </div>
                 </div>
                 <div style="overflow-x: auto;">
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th data-i18n="th_host_name">Nome</th>
-                                <th data-i18n="th_ip_target">IP / Host</th>
-                                <th data-i18n="th_location">Localização (Macro)</th>
-                                <th data-i18n="th_parent">Dispositivo Pai (Hierarquia)</th>
-                                <th data-i18n="th_grouping">Agrupamento</th>
-                                <th data-i18n="th_status">Status</th>
+                                <th id="th-host-name" class="sortable" onclick="setHostSort('name')"><span data-i18n="th_host_name">Nome</span><span class="sort-icon" id="sort-icon-host-name">▲</span></th>
+                                <th id="th-host-ip" class="sortable" onclick="setHostSort('ip')"><span data-i18n="th_ip_target">IP / Host</span><span class="sort-icon" id="sort-icon-host-ip">↕</span></th>
+                                <th id="th-host-location" class="sortable" onclick="setHostSort('location')"><span data-i18n="th_location">Localização (Macro)</span><span class="sort-icon" id="sort-icon-host-location">↕</span></th>
+                                <th id="th-host-parent" class="sortable" onclick="setHostSort('parent')"><span data-i18n="th_parent">Dispositivo Pai (Hierarquia)</span><span class="sort-icon" id="sort-icon-host-parent">↕</span></th>
+                                <th id="th-host-grouping" class="sortable" onclick="setHostSort('grouping')"><span data-i18n="th_grouping">Agrupamento</span><span class="sort-icon" id="sort-icon-host-grouping">↕</span></th>
+                                <th id="th-host-status" class="sortable" onclick="setHostSort('status')"><span data-i18n="th_status">Status</span><span class="sort-icon" id="sort-icon-host-status">↕</span></th>
                                 <th style="text-align: right;" data-i18n="th_actions">Ações</th>
                             </tr>
                         </thead>
@@ -144,21 +181,33 @@
         <!-- TAB 2: GROUPS -->
         <section id="tab-groups" class="admin-tab-panel">
             <div class="panel-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                     <div>
                         <h2 style="font-size: 1.2rem; color: #fff;" data-i18n="admin_groups_title">Agrupamentos de Dispositivos</h2>
                         <p style="font-size: 0.82rem; color: var(--text-dim);" data-i18n="admin_groups_desc">Agregue múltiplos dispositivos em um único estado consolidado de ONLINE / OFFLINE.</p>
                     </div>
-                    <button onclick="openAddGroupModal()" class="btn btn-primary" data-i18n="btn_add_group">+ Novo Grupo</button>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-muted);">
+                            <span data-i18n="sort_by_label">Ordenar por:</span>
+                            <select id="groups-sort-select" style="padding: 4px 8px; font-size: 0.82rem; background: var(--bg-subtle); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" onchange="handleGroupSortSelect(this.value)">
+                                <option value="name" data-i18n="th_group_name">Nome do Grupo</option>
+                                <option value="mode" data-i18n="th_aggregation_mode">Modo de Agregação</option>
+                                <option value="hosts" data-i18n="th_assigned_hosts">Dispositivos Atribuídos</option>
+                                <option value="description" data-i18n="th_description">Descrição</option>
+                            </select>
+                            <button id="groups-sort-dir-btn" class="btn btn-outline" style="padding: 3px 8px; font-size: 0.78rem;" onclick="toggleGroupSortDir()" title="Alternar direção">▲</button>
+                        </div>
+                        <button onclick="openAddGroupModal()" class="btn btn-primary" data-i18n="btn_add_group">+ Novo Grupo</button>
+                    </div>
                 </div>
                 <div style="overflow-x: auto;">
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th data-i18n="th_group_name">Nome do Grupo</th>
-                                <th data-i18n="th_aggregation_mode">Modo de Agregação</th>
-                                <th data-i18n="th_assigned_hosts">Dispositivos Atribuídos</th>
-                                <th data-i18n="th_description">Descrição</th>
+                                <th id="th-group-name" class="sortable" onclick="setGroupSort('name')"><span data-i18n="th_group_name">Nome do Grupo</span><span class="sort-icon" id="sort-icon-group-name">▲</span></th>
+                                <th id="th-group-mode" class="sortable" onclick="setGroupSort('mode')"><span data-i18n="th_aggregation_mode">Modo de Agregação</span><span class="sort-icon" id="sort-icon-group-mode">↕</span></th>
+                                <th id="th-group-hosts" class="sortable" onclick="setGroupSort('hosts')"><span data-i18n="th_assigned_hosts">Dispositivos Atribuídos</span><span class="sort-icon" id="sort-icon-group-hosts">↕</span></th>
+                                <th id="th-group-description" class="sortable" onclick="setGroupSort('description')"><span data-i18n="th_description">Descrição</span><span class="sort-icon" id="sort-icon-group-description">↕</span></th>
                                 <th style="text-align: right;" data-i18n="th_actions">Ações</th>
                             </tr>
                         </thead>

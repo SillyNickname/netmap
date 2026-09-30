@@ -9,9 +9,22 @@ const APP_BASE = (function() {
     return p;
 })();
 
+function getInitialLocationFilter() {
+    const params = new URLSearchParams(window.location.search);
+    const locParam = params.get("location") || params.get("loc");
+    if (locParam) {
+        return locParam;
+    }
+    const saved = localStorage.getItem("netmap_location_filter");
+    if (saved && saved !== "all") {
+        return saved;
+    }
+    return "all";
+}
+
 let currentUser = null;
 let currentLocations = [];
-let activeLocationFilter = 'all';
+let activeLocationFilter = getInitialLocationFilter();
 let countdownInterval = null;
 let secondsUntilNextPoll = 0;
 let currentTimelineHostId = null;
@@ -20,12 +33,40 @@ let currentDensity = localStorage.getItem("netmap_density") || "compact";
 
 document.addEventListener("DOMContentLoaded", () => {
     initDensity();
+    initLocationFilter();
     initAuth();
     loadDashboard();
     setupEventListeners();
     
     // Auto refresh status and tree periodically
     setInterval(refreshData, 10000);
+});
+
+function initLocationFilter() {
+    const params = new URLSearchParams(window.location.search);
+    const urlLoc = params.get("location") || params.get("loc");
+    if (urlLoc) {
+        activeLocationFilter = urlLoc;
+        localStorage.setItem("netmap_location_filter", urlLoc);
+    } else {
+        const saved = localStorage.getItem("netmap_location_filter");
+        if (saved && saved !== "all") {
+            activeLocationFilter = saved;
+            const url = new URL(window.location.href);
+            url.searchParams.set("location", saved);
+            window.history.replaceState({ location: saved }, "", url.toString());
+        } else {
+            activeLocationFilter = "all";
+        }
+    }
+}
+
+window.addEventListener("popstate", () => {
+    const params = new URLSearchParams(window.location.search);
+    const loc = params.get("location") || params.get("loc") || "all";
+    if (loc !== activeLocationFilter) {
+        filterLocation(loc, false);
+    }
 });
 
 // ----------------- Density (Compact / Tall) -----------------
@@ -237,27 +278,44 @@ function renderLocationFilters() {
 
     fetch(`${APP_BASE}/api/tree`).then(r => r.json()).then(fullData => {
         const locs = fullData.locations || [];
+        const allHref = `${APP_BASE}/`;
         let html = `
-            <button class="pill-tab ${activeLocationFilter === 'all' ? 'active' : ''}" 
-                    onclick="filterLocation('all')">
+            <a href="${allHref}" class="pill-tab ${activeLocationFilter === 'all' ? 'active' : ''}" 
+               data-location="all"
+               onclick="event.preventDefault(); filterLocation('all');">
                 ${t("all_sites")} (${locs.reduce((acc, l) => acc + l.total_count, 0)})
-            </button>
+            </a>
         `;
         locs.forEach(l => {
             const isActive = activeLocationFilter === l.name;
+            const locHref = `${APP_BASE}/?location=${encodeURIComponent(l.name)}`;
             html += `
-                <button class="pill-tab ${isActive ? 'active' : ''}" 
-                        onclick="filterLocation('${escapeHtml(l.name)}')">
+                <a href="${locHref}" class="pill-tab ${isActive ? 'active' : ''}" 
+                   data-location="${escapeHtml(l.name)}"
+                   onclick="event.preventDefault(); filterLocation(this.getAttribute('data-location'));">
                     ${escapeHtml(l.name)} (${l.total_count})
-                </button>
+                </a>
             `;
         });
         tabsContainer.innerHTML = html;
     });
 }
 
-function filterLocation(locName) {
-    activeLocationFilter = locName;
+function filterLocation(locName, updateHistory = true) {
+    activeLocationFilter = locName || "all";
+    localStorage.setItem("netmap_location_filter", activeLocationFilter);
+
+    if (updateHistory) {
+        const url = new URL(window.location.href);
+        if (activeLocationFilter === "all") {
+            url.searchParams.delete("location");
+            url.searchParams.delete("loc");
+        } else {
+            url.searchParams.set("location", activeLocationFilter);
+        }
+        window.history.pushState({ location: activeLocationFilter }, "", url.toString());
+    }
+
     loadTree(true);
 }
 
@@ -283,11 +341,12 @@ function renderTree() {
 
     let html = "";
     currentLocations.forEach(loc => {
+        const locHref = `${APP_BASE}/?location=${encodeURIComponent(loc.name)}`;
         html += `
             <div class="location-section">
                 <div class="location-header">
                     <div class="location-title">
-                        <span>📍 ${escapeHtml(loc.name)}</span>
+                        <a href="${locHref}" data-location="${escapeHtml(loc.name)}" onclick="event.preventDefault(); filterLocation(this.getAttribute('data-location'));" style="color: inherit; text-decoration: none; cursor: pointer;">📍 ${escapeHtml(loc.name)}</a>
                         <span class="location-badge">${loc.total_count} ${t("hosts_count_suffix")}</span>
                     </div>
                     <div style="display: flex; gap: 14px; font-size: 0.8rem; font-family: var(--font-mono);">
