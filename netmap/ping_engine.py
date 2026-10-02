@@ -25,12 +25,12 @@ def is_valid_target(target: str) -> bool:
     return bool(HOSTNAME_REGEX.match(target))
 
 class PingResult:
-    def __init__(self, host_id: int, is_up: bool, rtt_ms: Optional[float] = None, error_msg: Optional[str] = None):
+    def __init__(self, host_id: int, is_up: bool, rtt_ms: Optional[float] = None, error_msg: Optional[str] = None, timestamp: Optional[int] = None):
         self.host_id = host_id
         self.is_up = is_up
         self.rtt_ms = rtt_ms
         self.error_msg = error_msg
-        self.timestamp = int(time.time())
+        self.timestamp = timestamp if timestamp is not None else int(time.time())
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -254,19 +254,28 @@ class PingEngine:
                         })
         return result_map
 
-    async def get_host_history_timeline(self, host_id: int, hours: Optional[int] = None) -> Dict[str, Any]:
+    async def get_host_history_timeline(self, host_id: int, hours: Optional[int] = None, end_time: Optional[int] = None) -> Dict[str, Any]:
+        # Default and maximum window is 48 hours
         if hours is None:
-            hours = config.retention_hours
-        cutoff = int(time.time()) - (hours * 3600)
+            hours = 48
+        hours = min(48, max(1, int(hours)))
+
+        now_ts = int(time.time())
+        if end_time is not None:
+            end_ts = min(now_ts, int(end_time))
+        else:
+            end_ts = now_ts
+
+        start_ts = end_ts - (hours * 3600)
 
         async with get_history_db() as db:
             query = """
                 SELECT timestamp, is_up, rtt_ms, error_msg
                 FROM ping_history
-                WHERE host_id = ? AND timestamp >= ?
+                WHERE host_id = ? AND timestamp >= ? AND timestamp <= ?
                 ORDER BY timestamp ASC
             """
-            async with db.execute(query, (host_id, cutoff)) as cursor:
+            async with db.execute(query, (host_id, start_ts, end_ts)) as cursor:
                 records = [
                     {
                         "timestamp": row["timestamp"],
@@ -276,6 +285,15 @@ class PingEngine:
                     }
                     for row in await cursor.fetchall()
                 ]
+
+            bounds_query = "SELECT MIN(timestamp) as min_ts, MAX(timestamp) as max_ts FROM ping_history WHERE host_id = ?"
+            async with db.execute(bounds_query, (host_id,)) as cursor:
+                bounds_row = await cursor.fetchone()
+                earliest_ts = bounds_row["min_ts"] if bounds_row else None
+                latest_ts = bounds_row["max_ts"] if bounds_row else None
+
+        has_earlier = bool(earliest_ts is not None and earliest_ts < start_ts)
+        has_later = bool(latest_ts is not None and end_ts < latest_ts and (now_ts - end_ts) >= 30)
 
         total_checks = len(records)
         up_checks = sum(1 for r in records if r["is_up"])
@@ -296,15 +314,22 @@ class PingEngine:
                     "duration_seconds": r["timestamp"] - outage_start
                 })
         if in_outage and outage_start:
+            inc_end = end_ts if (now_ts - end_ts) > 60 else None
             incidents.append({
                 "start": outage_start,
-                "end": None,
-                "duration_seconds": int(time.time()) - outage_start
+                "end": inc_end,
+                "duration_seconds": (end_ts if inc_end else now_ts) - outage_start
             })
 
         return {
             "host_id": host_id,
             "period_hours": hours,
+            "start_time": start_ts,
+            "end_time": end_ts,
+            "earliest_time": earliest_ts,
+            "latest_time": latest_ts,
+            "has_earlier": has_earlier,
+            "has_later": has_later,
             "total_checks": total_checks,
             "up_checks": up_checks,
             "uptime_pct": uptime_pct,

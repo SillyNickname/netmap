@@ -28,7 +28,8 @@ let activeLocationFilter = getInitialLocationFilter();
 let countdownInterval = null;
 let secondsUntilNextPoll = 0;
 let currentTimelineHostId = null;
-let currentTimelineHours = 24;
+let currentTimelineHours = 48;
+let currentTimelineEndTime = null;
 let currentDensity = localStorage.getItem("netmap_density") || "compact";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -278,22 +279,70 @@ function renderLocationFilters() {
 
     fetch(`${APP_BASE}/api/tree`).then(r => r.json()).then(fullData => {
         const locs = fullData.locations || [];
+        const devSummary = fullData.device_summary || null;
+        
+        let allAlertBadge = "";
+        let allAlertClass = "";
+        if (devSummary && devSummary.alert_level) {
+            allAlertClass = `alert-${devSummary.alert_level}`;
+            const warnTitle = (devSummary.alert_level === "red" ? t("loc_warning_red_title") : t("loc_warning_yellow_title"))
+                .replace("{down}", devSummary.down)
+                .replace("{total}", devSummary.total)
+                .replace("{pct}", devSummary.down_pct);
+            allAlertBadge = `
+                <span class="loc-warning-badge badge-${devSummary.alert_level}" title="${escapeHtml(warnTitle)}">
+                    <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                    </svg>
+                </span>
+            `;
+        }
+
         const allHref = `${APP_BASE}/`;
+        const totalAllCount = locs.reduce((acc, l) => acc + (l.device_total !== undefined ? l.device_total : l.total_count), 0);
         let html = `
-            <a href="${allHref}" class="pill-tab ${activeLocationFilter === 'all' ? 'active' : ''}" 
+            <a href="${allHref}" class="pill-tab ${activeLocationFilter === 'all' ? 'active' : ''} ${allAlertClass}" 
                data-location="all"
                onclick="event.preventDefault(); filterLocation('all');">
-                ${t("all_sites")} (${locs.reduce((acc, l) => acc + l.total_count, 0)})
+                ${t("all_sites")} (${totalAllCount})${allAlertBadge}
             </a>
         `;
         locs.forEach(l => {
             const isActive = activeLocationFilter === l.name;
             const locHref = `${APP_BASE}/?location=${encodeURIComponent(l.name)}`;
+            
+            let locAlertBadge = "";
+            let locAlertClass = "";
+            const devTotal = l.device_total !== undefined ? l.device_total : l.total_count;
+            const devDown = l.device_down !== undefined ? l.device_down : l.down_count;
+            const downPct = l.device_down_pct !== undefined ? l.device_down_pct : (devTotal > 0 ? (devDown / devTotal) * 100 : 0);
+            
+            let alertLevel = l.alert_level;
+            if (!alertLevel && devTotal > 0 && devDown > 0) {
+                if (downPct >= 75) alertLevel = "red";
+                else if (downPct >= 50) alertLevel = "yellow";
+            }
+
+            if (alertLevel) {
+                locAlertClass = `alert-${alertLevel}`;
+                const warnTitle = (alertLevel === "red" ? t("loc_warning_red_title") : t("loc_warning_yellow_title"))
+                    .replace("{down}", devDown)
+                    .replace("{total}", devTotal)
+                    .replace("{pct}", downPct);
+                locAlertBadge = `
+                    <span class="loc-warning-badge badge-${alertLevel}" title="${escapeHtml(warnTitle)}">
+                        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                            <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                        </svg>
+                    </span>
+                `;
+            }
+
             html += `
-                <a href="${locHref}" class="pill-tab ${isActive ? 'active' : ''}" 
+                <a href="${locHref}" class="pill-tab ${isActive ? 'active' : ''} ${locAlertClass}" 
                    data-location="${escapeHtml(l.name)}"
                    onclick="event.preventDefault(); filterLocation(this.getAttribute('data-location'));">
-                    ${escapeHtml(l.name)} (${l.total_count})
+                    ${escapeHtml(l.name)} (${devTotal})${locAlertBadge}
                 </a>
             `;
         });
@@ -508,9 +557,22 @@ function renderSparkline30m(records) {
 
 // ----------------- Host Timeline Modal -----------------
 
-async function openTimelineModal(hostId, hours = 24) {
+function formatDurationSeconds(sec) {
+    if (sec < 60) return `${sec}s`;
+    const mins = Math.floor(sec / 60);
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    if (hrs < 24) return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    const remHrs = hrs % 24;
+    return remHrs > 0 ? `${days}d ${remHrs}h` : `${days}d`;
+}
+
+async function openTimelineModal(hostId, hours = 48, endTime = null) {
     currentTimelineHostId = hostId;
-    currentTimelineHours = hours;
+    currentTimelineHours = Math.min(48, Math.max(1, hours || 48));
+    currentTimelineEndTime = endTime;
 
     const modal = document.getElementById("timeline-modal");
     modal.classList.add("active");
@@ -523,7 +585,11 @@ async function openTimelineModal(hostId, hours = 24) {
     `;
 
     try {
-        const res = await fetch(`${APP_BASE}/api/hosts/${hostId}/timeline?hours=${hours}`);
+        const queryParams = new URLSearchParams({ hours: currentTimelineHours });
+        if (endTime !== null && endTime !== undefined) {
+            queryParams.set("end_time", endTime);
+        }
+        const res = await fetch(`${APP_BASE}/api/hosts/${hostId}/timeline?${queryParams.toString()}`);
         if (!res.ok) throw new Error("Host not found");
         const data = await res.json();
         renderTimelineData(data);
@@ -540,16 +606,183 @@ function renderTimelineData(data) {
 
     document.getElementById("timeline-host-title").innerText = host.name;
 
+    const startTs = timeline.start_time || (timeline.end_time - currentTimelineHours * 3600);
+    const endTs = timeline.end_time || Math.floor(Date.now() / 1000);
+    const earliestTs = timeline.earliest_time;
+    const hasEarlier = !!timeline.has_earlier;
+    const hasLater = !!timeline.has_later;
+
+    const startDt = new Date(startTs * 1000);
+    const endDt = new Date(endTs * 1000);
+
+    const pad = n => String(n).padStart(2, '0');
+    const formatDt = dt => `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    const rangeDisplay = `${formatDt(startDt)} ➔ ${formatDt(endDt)}`;
+
+    // Time Navigation Handlers
+    const earliestTarget = earliestTs ? (earliestTs + currentTimelineHours * 3600) : null;
+    const back48hTarget = endTs - (48 * 3600);
+    const back24hTarget = endTs - (24 * 3600);
+    const fwd24hTarget = endTs + (24 * 3600);
+    const fwd48hTarget = endTs + (48 * 3600);
+
+    // 1. Time Navigation Toolbar
+    const navToolbarHtml = `
+        <div class="timeline-nav-toolbar">
+            <div class="timeline-nav-group">
+                <button class="btn btn-outline btn-xs" ${!hasEarlier || !earliestTarget ? 'disabled' : ''} 
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${earliestTarget})"
+                    title="${t("time_earliest")}">
+                    ⏮ ${t("time_earliest")}
+                </button>
+                <button class="btn btn-outline btn-xs" ${!hasEarlier ? 'disabled' : ''} 
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${back48hTarget})"
+                    title="${t("time_back_48h")}">
+                    ◀◀ -48h
+                </button>
+                <button class="btn btn-outline btn-xs" ${!hasEarlier ? 'disabled' : ''} 
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${back24hTarget})"
+                    title="${t("time_back_24h")}">
+                    ◀ -24h
+                </button>
+            </div>
+            <div class="timeline-nav-range">
+                <span>📅 ${rangeDisplay}</span>
+            </div>
+            <div class="timeline-nav-group">
+                <button class="btn btn-outline btn-xs" ${!hasLater ? 'disabled' : ''} 
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${fwd24hTarget})"
+                    title="${t("time_fwd_24h")}">
+                    +24h ▶
+                </button>
+                <button class="btn btn-outline btn-xs" ${!hasLater ? 'disabled' : ''} 
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${fwd48hTarget})"
+                    title="${t("time_fwd_48h")}">
+                    +48h ▶▶
+                </button>
+                <button class="btn btn-outline btn-xs" ${!hasLater ? 'disabled' : ''} 
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, null)"
+                    title="${t("time_now")}">
+                    ⏭ ${t("time_now")}
+                </button>
+            </div>
+        </div>
+    `;
+
+    // 2. Time Bar (Ruler) above poll history
+    const totalDurationSec = Math.max(1, endTs - startTs);
+    const tickCount = 5;
+    let ticksHtml = "";
+    for (let i = 0; i < tickCount; i++) {
+        const pct = (i / (tickCount - 1)) * 100;
+        const tickTs = startTs + Math.round(totalDurationSec * (i / (tickCount - 1)));
+        const tickDt = new Date(tickTs * 1000);
+        const tickText = `${pad(tickDt.getDate())}/${pad(tickDt.getMonth() + 1)} ${pad(tickDt.getHours())}:${pad(tickDt.getMinutes())}`;
+        let cls = "time-bar-tick";
+        if (i === 0) cls += " tick-start";
+        else if (i === tickCount - 1) cls += " tick-end";
+        ticksHtml += `<div class="${cls}" style="left: ${pct}%;"><span>${tickText}</span></div>`;
+    }
+
+    const timeBarHtml = `
+        <div class="timeline-time-bar">
+            <div class="time-bar-track"></div>
+            <div class="time-bar-ticks">${ticksHtml}</div>
+        </div>
+    `;
+
+    // 3. Poll History Bar: Condensed or Standard Slices
     let slicesHtml = "";
+    const isDense = records.length > 120;
+
     if (records.length > 0) {
-        records.forEach(r => {
-            const dt = new Date(r.timestamp * 1000).toLocaleString();
-            const rttStr = r.rtt_ms ? `${r.rtt_ms.toFixed(1)}ms` : "❌";
-            const cls = r.is_up ? "up" : "down";
-            slicesHtml += `<div class="timeline-slice ${cls}" title="${dt} - ${r.is_up ? t("status_up") : t("status_down")} (${rttStr})"></div>`;
-        });
+        if (isDense) {
+            // Group consecutive polls of unchanging state
+            const runs = [];
+            let currentRun = null;
+            records.forEach(r => {
+                if (!currentRun || currentRun.is_up !== r.is_up) {
+                    if (currentRun) runs.push(currentRun);
+                    currentRun = {
+                        is_up: r.is_up,
+                        start_ts: r.timestamp,
+                        end_ts: r.timestamp,
+                        count: 1,
+                        rtts: (r.rtt_ms !== null && r.rtt_ms !== undefined) ? [r.rtt_ms] : [],
+                        errors: r.error_msg ? [r.error_msg] : []
+                    };
+                } else {
+                    currentRun.end_ts = r.timestamp;
+                    currentRun.count++;
+                    if (r.rtt_ms !== null && r.rtt_ms !== undefined) currentRun.rtts.push(r.rtt_ms);
+                    if (r.error_msg) currentRun.errors.push(r.error_msg);
+                }
+            });
+            if (currentRun) runs.push(currentRun);
+
+            runs.forEach(run => {
+                const runDurSec = Math.max(60, run.end_ts - run.start_ts + 60);
+                const sDt = new Date(run.start_ts * 1000);
+                const eDt = new Date(run.end_ts * 1000);
+                const startStr = `${formatDt(sDt)}`;
+                const endStr = `${formatDt(eDt)}`;
+                const durStr = formatDurationSeconds(Math.max(60, run.end_ts - run.start_ts));
+                const isCondensed = run.count > 1;
+                const stateCls = run.is_up ? "up" : "down";
+                const typeCls = isCondensed ? "condensed" : "single";
+
+                let avgRttStr = "";
+                if (run.is_up && run.rtts.length > 0) {
+                    const avg = (run.rtts.reduce((a, b) => a + b, 0) / run.rtts.length).toFixed(1);
+                    avgRttStr = `${avg}ms`;
+                }
+                const errStr = run.errors[0] || (run.is_up ? "" : t("status_timeout"));
+
+                const nativeTitle = isCondensed
+                    ? `${run.is_up ? t("stable_period") : t("outage_period")}\n${t("period_start")} ${startStr}\n${t("period_end")} ${endStr}\n${t("period_duration")} ${durStr}\n${t("period_checks")} ${run.count} (${t("period_unchanging")})${avgRttStr ? `\n${t("avg_latency")} ${avgRttStr}` : ''}`
+                    : `${startStr} - ${run.is_up ? t("status_up") : t("status_down")} (${avgRttStr || errStr})`;
+
+                slicesHtml += `
+                    <div class="timeline-slice ${typeCls} ${stateCls}"
+                         style="flex: ${runDurSec}; min-width: ${isCondensed ? '4px' : '2px'};"
+                         data-type="${typeCls}"
+                         data-is-up="${run.is_up ? '1' : '0'}"
+                         data-start="${escapeHtml(startStr)}"
+                         data-end="${escapeHtml(endStr)}"
+                         data-dur="${escapeHtml(durStr)}"
+                         data-count="${run.count}"
+                         data-rtt="${escapeHtml(avgRttStr)}"
+                         data-err="${escapeHtml(errStr)}"
+                         title="${escapeHtml(nativeTitle)}"></div>
+                `;
+            });
+        } else {
+            // Standard discrete bars for non-dense history
+            records.forEach(r => {
+                const dt = new Date(r.timestamp * 1000);
+                const dtStr = formatDt(dt);
+                const rttStr = (r.rtt_ms !== null && r.rtt_ms !== undefined) ? `${r.rtt_ms.toFixed(1)}ms` : "";
+                const errStr = r.error_msg || (r.is_up ? "" : t("status_timeout"));
+                const cls = r.is_up ? "up" : "down";
+                const nativeTitle = `${dtStr} - ${r.is_up ? t("status_up") : t("status_down")} (${rttStr || errStr})`;
+
+                slicesHtml += `
+                    <div class="timeline-slice single ${cls}"
+                         style="flex: 1; min-width: 2px;"
+                         data-type="single"
+                         data-is-up="${r.is_up ? '1' : '0'}"
+                         data-start="${escapeHtml(dtStr)}"
+                         data-end="${escapeHtml(dtStr)}"
+                         data-dur="1m"
+                         data-count="1"
+                         data-rtt="${escapeHtml(rttStr)}"
+                         data-err="${escapeHtml(errStr)}"
+                         title="${escapeHtml(nativeTitle)}"></div>
+                `;
+            });
+        }
     } else {
-        slicesHtml = `<div style="padding: 4px; color: var(--text-dim); font-size: 0.8rem;">${t("no_records_window")}</div>`;
+        slicesHtml = `<div style="padding: 4px; color: var(--text-dim); font-size: 0.8rem; width: 100%; text-align: center;">${t("no_records_window")}</div>`;
     }
 
     let incidentsHtml = "";
@@ -567,10 +800,9 @@ function renderTimelineData(data) {
                     </thead>
                     <tbody>
                         ${incidents.map(inc => {
-                            const startStr = new Date(inc.start * 1000).toLocaleTimeString();
-                            const endStr = inc.end ? new Date(inc.end * 1000).toLocaleTimeString() : `<span style="color: var(--down-color); font-weight: 700;">${t("incident_ongoing")}</span>`;
-                            const mins = Math.round(inc.duration_seconds / 60);
-                            const durStr = mins >= 60 ? `${(mins/60).toFixed(1)}h` : `${mins}m (${inc.duration_seconds}s)`;
+                            const startStr = new Date(inc.start * 1000).toLocaleString();
+                            const endStr = inc.end ? new Date(inc.end * 1000).toLocaleString() : `<span style="color: var(--down-color); font-weight: 700;">${t("incident_ongoing")}</span>`;
+                            const durStr = formatDurationSeconds(inc.duration_seconds);
                             return `
                                 <tr>
                                     <td>${startStr}</td>
@@ -604,12 +836,14 @@ function renderTimelineData(data) {
                 ${host.description ? `<div style="font-size: 0.82rem; color: var(--text-dim); margin-top: 4px;">${escapeHtml(host.description)}</div>` : ""}
             </div>
             <div class="pill-tabs">
-                <button class="pill-tab ${currentTimelineHours === 6 ? 'active' : ''}" onclick="openTimelineModal(${host.id}, 6)">6h</button>
-                <button class="pill-tab ${currentTimelineHours === 12 ? 'active' : ''}" onclick="openTimelineModal(${host.id}, 12)">12h</button>
-                <button class="pill-tab ${currentTimelineHours === 24 ? 'active' : ''}" onclick="openTimelineModal(${host.id}, 24)">24h</button>
-                <button class="pill-tab ${currentTimelineHours === 48 ? 'active' : ''}" onclick="openTimelineModal(${host.id}, 48)">48h</button>
+                <button class="pill-tab ${currentTimelineHours === 6 ? 'active' : ''}" onclick="openTimelineModal(${host.id}, 6, currentTimelineEndTime)">6h</button>
+                <button class="pill-tab ${currentTimelineHours === 12 ? 'active' : ''}" onclick="openTimelineModal(${host.id}, 12, currentTimelineEndTime)">12h</button>
+                <button class="pill-tab ${currentTimelineHours === 24 ? 'active' : ''}" onclick="openTimelineModal(${host.id}, 24, currentTimelineEndTime)">24h</button>
+                <button class="pill-tab ${currentTimelineHours === 48 ? 'active' : ''}" onclick="openTimelineModal(${host.id}, 48, currentTimelineEndTime)">48h</button>
             </div>
         </div>
+
+        ${navToolbarHtml}
 
         <div class="timeline-banner">
             <div>
@@ -626,21 +860,102 @@ function renderTimelineData(data) {
         </div>
 
         <div>
-            <div style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 6px; display: flex; justify-content: space-between;">
-                <span>${currentTimelineHours} ${t("hours_ago")}</span>
-                <span>${t("now")}</span>
-            </div>
-            <div class="timeline-chart-bar">
+            ${timeBarHtml}
+            <div class="timeline-chart-bar" id="timeline-chart-bar-el">
                 ${slicesHtml}
             </div>
         </div>
 
         ${incidentsHtml}
     `;
+
+    setupTimelineTooltip();
+}
+
+function setupTimelineTooltip() {
+    let tooltip = document.getElementById("timeline-floating-tooltip");
+    if (!tooltip) {
+        tooltip = document.createElement("div");
+        tooltip.id = "timeline-floating-tooltip";
+        tooltip.className = "timeline-floating-tooltip";
+        document.body.appendChild(tooltip);
+    }
+
+    const slices = document.querySelectorAll(".timeline-slice");
+    slices.forEach(slice => {
+        slice.addEventListener("mouseenter", (e) => {
+            const isUp = slice.getAttribute("data-is-up") === "1";
+            const type = slice.getAttribute("data-type");
+            const start = slice.getAttribute("data-start");
+            const end = slice.getAttribute("data-end");
+            const dur = slice.getAttribute("data-dur");
+            const count = slice.getAttribute("data-count");
+            const rtt = slice.getAttribute("data-rtt");
+            const err = slice.getAttribute("data-err");
+
+            let html = "";
+            if (type === "condensed") {
+                const headerColor = isUp ? "var(--up-color)" : "var(--down-color)";
+                const headerText = isUp ? t("stable_period") : t("outage_period");
+                html = `
+                    <div class="tt-title" style="color: ${headerColor};">
+                        <span>●</span> ${headerText}
+                    </div>
+                    <div class="tt-row"><span>${t("period_start")}</span><span class="tt-val">${start}</span></div>
+                    <div class="tt-row"><span>${t("period_end")}</span><span class="tt-val">${end}</span></div>
+                    <div class="tt-row"><span>${t("period_duration")}</span><span class="tt-val">${dur}</span></div>
+                    <div class="tt-row"><span>${t("period_checks")}</span><span class="tt-val">${count}</span></div>
+                    ${rtt ? `<div class="tt-row"><span>${t("avg_latency")}</span><span class="tt-val">${rtt}</span></div>` : ''}
+                    ${err ? `<div class="tt-row"><span>Status:</span><span class="tt-val" style="color:var(--down-color);">${err}</span></div>` : ''}
+                `;
+            } else {
+                const headerColor = isUp ? "var(--up-color)" : "var(--down-color)";
+                const headerText = isUp ? t("status_up") : t("status_down");
+                html = `
+                    <div class="tt-title" style="color: ${headerColor};">
+                        <span>●</span> ${headerText}
+                    </div>
+                    <div class="tt-row"><span>Data/Hora:</span><span class="tt-val">${start}</span></div>
+                    ${rtt ? `<div class="tt-row"><span>${t("th_latency")}:</span><span class="tt-val">${rtt}</span></div>` : ''}
+                    ${err ? `<div class="tt-row"><span>Status:</span><span class="tt-val" style="color:var(--down-color);">${err}</span></div>` : ''}
+                `;
+            }
+
+            tooltip.innerHTML = html;
+            tooltip.style.display = "block";
+            positionTooltip(e, tooltip);
+        });
+
+        slice.addEventListener("mousemove", (e) => {
+            positionTooltip(e, tooltip);
+        });
+
+        slice.addEventListener("mouseleave", () => {
+            tooltip.style.display = "none";
+        });
+    });
+}
+
+function positionTooltip(e, tooltip) {
+    const pad = 14;
+    let left = e.clientX + pad;
+    let top = e.clientY + pad;
+
+    const width = 280;
+    if (left + width > window.innerWidth - 20) {
+        left = e.clientX - width - pad;
+    }
+    if (top + 160 > window.innerHeight) {
+        top = e.clientY - 160;
+    }
+    tooltip.style.left = `${Math.max(10, left)}px`;
+    tooltip.style.top = `${Math.max(10, top)}px`;
 }
 
 function closeTimelineModal() {
     document.getElementById("timeline-modal").classList.remove("active");
+    const tooltip = document.getElementById("timeline-floating-tooltip");
+    if (tooltip) tooltip.style.display = "none";
 }
 
 // ----------------- Group Details Modal -----------------

@@ -657,24 +657,225 @@ body {
   font-family: var(--font-mono);
 }
 
-.timeline-chart-bar {
+/* Location bar warning badges */
+.loc-warning-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.loc-warning-badge.badge-red {
+  color: #ef4444;
+  filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.8));
+  animation: pulse-red-badge 2s infinite ease-in-out;
+}
+
+.loc-warning-badge.badge-yellow {
+  color: #f59e0b;
+  filter: drop-shadow(0 0 3px rgba(245, 158, 11, 0.8));
+}
+
+@keyframes pulse-red-badge {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(1.15); }
+}
+
+.pill-tab.alert-red {
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.pill-tab.alert-yellow {
+  border-color: rgba(245, 158, 11, 0.6) !important;
+  background: rgba(245, 158, 11, 0.08) !important;
+}
+
+/* History Time Navigation Toolbar */
+.timeline-nav-toolbar {
   display: flex;
-  height: 24px;
-  gap: 2px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 6px 0;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.timeline-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-nav-range {
+  font-size: 0.82rem;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-xs {
+  padding: 2px 7px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+}
+
+/* Time Bar / Ruler above Poll History */
+.timeline-time-bar {
+  position: relative;
+  width: 100%;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+.time-bar-track {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  position: relative;
+  margin-bottom: 2px;
+}
+
+.time-bar-ticks {
+  position: relative;
+  width: 100%;
+  height: 16px;
+}
+
+.time-bar-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.time-bar-tick::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  width: 1px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.time-bar-tick.tick-start {
+  transform: translateX(0%);
+}
+.time-bar-tick.tick-start::before {
+  left: 0;
+}
+
+.time-bar-tick.tick-end {
+  transform: translateX(-100%);
+}
+.time-bar-tick.tick-end::before {
+  right: 0;
+}
+
+/* Timeline Chart Bar and Slices */
+.timeline-chart-bar {
+  position: relative;
+  display: flex;
+  height: 28px;
+  gap: 1px;
   background: #0b0f19;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   overflow: hidden;
   padding: 2px;
 }
 
 .timeline-slice {
-  flex: 1;
   height: 100%;
   border-radius: 1px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
 }
+
+.timeline-slice:hover {
+  opacity: 0.85;
+  filter: brightness(1.2);
+  z-index: 5;
+}
+
+/* Standard single poll slice */
 .timeline-slice.up { background-color: var(--up-color); }
 .timeline-slice.down { background-color: var(--down-color); }
 .timeline-slice.degraded { background-color: var(--degraded-color); }
+
+/* Condensed unchanging period slices */
+.timeline-slice.condensed.up {
+  background: repeating-linear-gradient(
+    45deg,
+    #10b981,
+    #10b981 6px,
+    #059669 6px,
+    #059669 12px
+  );
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.4);
+}
+
+.timeline-slice.condensed.down {
+  background: repeating-linear-gradient(
+    45deg,
+    #ef4444,
+    #ef4444 6px,
+    #b91c1c 6px,
+    #b91c1c 12px
+  );
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.4);
+}
+
+/* Floating Tooltip */
+.timeline-floating-tooltip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  color: var(--text-main);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: none;
+  max-width: 300px;
+  line-height: 1.4;
+}
+
+.timeline-floating-tooltip .tt-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.timeline-floating-tooltip .tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+}
+.timeline-floating-tooltip .tt-val {
+  color: #fff;
+  font-family: var(--font-mono);
+}
 
 .incident-table {
   width: 100%;

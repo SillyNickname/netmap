@@ -234,18 +234,51 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
         }
 
     # 3. Assemble locations and hierarchical tree
+    devices_by_loc: Dict[str, Dict[str, int]] = {}
+    for h in hosts_rows:
+        loc = h["location"]
+        if loc not in devices_by_loc:
+            devices_by_loc[loc] = {"total": 0, "up": 0, "down": 0}
+        devices_by_loc[loc]["total"] += 1
+        st = ping_engine.latest_host_status.get(h["id"])
+        if st and st.is_up is True:
+            devices_by_loc[loc]["up"] += 1
+        elif st and st.is_up is False:
+            devices_by_loc[loc]["down"] += 1
+
     locations_map: Dict[str, Dict[str, Any]] = {}
 
     for node_id, node in tree_nodes.items():
         loc = node["location"]
         if loc not in locations_map:
+            dev_stats = devices_by_loc.get(loc, {"total": 0, "up": 0, "down": 0})
+            dev_total = dev_stats["total"]
+            dev_down = dev_stats["down"]
+            dev_up = dev_stats["up"]
+            dev_down_pct = round((dev_down / dev_total) * 100, 1) if dev_total > 0 else 0.0
+
+            # Warning sign thresholds:
+            # Red: >= 75% down
+            # Yellow: >= 50% down (and < 75%)
+            alert_level = None
+            if dev_total > 0 and dev_down > 0:
+                if dev_down_pct >= 75.0:
+                    alert_level = "red"
+                elif dev_down_pct >= 50.0:
+                    alert_level = "yellow"
+
             locations_map[loc] = {
                 "name": loc,
                 "roots": [],
                 "total_count": 0,
                 "up_count": 0,
                 "down_count": 0,
-                "degraded_count": 0
+                "degraded_count": 0,
+                "device_total": dev_total,
+                "device_up": dev_up,
+                "device_down": dev_down,
+                "device_down_pct": dev_down_pct,
+                "alert_level": alert_level
             }
         loc_data = locations_map[loc]
         loc_data["total_count"] += 1
@@ -264,15 +297,37 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
         else:
             loc_data["roots"].append(node)
 
+    all_dev_total = sum(d["total"] for d in devices_by_loc.values())
+    all_dev_down = sum(d["down"] for d in devices_by_loc.values())
+    all_dev_up = sum(d["up"] for d in devices_by_loc.values())
+    all_down_pct = round((all_dev_down / all_dev_total) * 100, 1) if all_dev_total > 0 else 0.0
+    all_alert_level = None
+    if all_dev_total > 0 and all_dev_down > 0:
+        if all_down_pct >= 75.0:
+            all_alert_level = "red"
+        elif all_down_pct >= 50.0:
+            all_alert_level = "yellow"
+
     locations_list = list(locations_map.values())
     return {
         "locations": locations_list,
         "groups": groups,
-        "last_poll_time": ping_engine.last_poll_time
+        "last_poll_time": ping_engine.last_poll_time,
+        "device_summary": {
+            "total": all_dev_total,
+            "up": all_dev_up,
+            "down": all_dev_down,
+            "down_pct": all_down_pct,
+            "alert_level": all_alert_level
+        }
     }
 
 @router.get("/hosts/{host_id}/timeline")
-async def get_host_timeline(host_id: int, hours: Optional[int] = Query(None)):
+async def get_host_timeline(
+    host_id: int, 
+    hours: Optional[int] = Query(48, ge=1, le=48),
+    end_time: Optional[int] = Query(None)
+):
     async with get_hosts_db() as db:
         query = """
             SELECT h.id, h.name, h.ip_address, h.location, h.parent_id, p.name as parent_name,
@@ -287,7 +342,7 @@ async def get_host_timeline(host_id: int, hours: Optional[int] = Query(None)):
     if not host_row:
         raise HTTPException(status_code=404, detail="Host not found")
 
-    timeline_data = await ping_engine.get_host_history_timeline(host_id, hours=hours)
+    timeline_data = await ping_engine.get_host_history_timeline(host_id, hours=hours, end_time=end_time)
     
     latest = ping_engine.latest_host_status.get(host_id)
     return {

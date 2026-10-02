@@ -291,14 +291,14 @@ async def test_reverse_proxy_subpath_support():
         root_res = await client.get("/")
         assert root_res.status_code == 200
         assert 'window.NETMAP_BASE = "";' in root_res.text
-        assert 'href="/static/css/netmap.css"' in root_res.text
+        assert 'href="/static/css/netmap.css' in root_res.text
 
         # 2. Behind proxy with X-Forwarded-Prefix: /netmap (stripped path)
         proxied_res = await client.get("/", headers={"X-Forwarded-Prefix": "/netmap"})
         assert proxied_res.status_code == 200
         assert 'window.NETMAP_BASE = "/netmap";' in proxied_res.text
-        assert 'href="/netmap/static/css/netmap.css"' in proxied_res.text
-        assert 'src="/netmap/static/js/app.js"' in proxied_res.text
+        assert 'href="/netmap/static/css/netmap.css' in proxied_res.text
+        assert 'src="/netmap/static/js/app.js' in proxied_res.text
         assert 'href="/netmap/" class="brand"' in proxied_res.text
 
         # 3. Behind proxy with X-Forwarded-Prefix: /netmap (stripped static asset requests from Nginx)
@@ -382,5 +382,92 @@ async def test_admin_sorting_and_location_filtering():
         res_index = await client.get("/?location=Site-A")
         assert res_index.status_code == 200
         assert "location-tabs" in res_index.text
+
+@pytest.mark.asyncio
+async def test_location_warning_levels_and_timeline_pagination():
+    import time
+    from netmap.ping_engine import ping_engine, PingResult
+    from netmap.db import get_history_db
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+
+        # Create hosts in Location-Yellow (2 hosts) and Location-Red (4 hosts)
+        y1_res = await client.post("/api/admin/hosts", json={"name": "Y1", "ip_address": "10.1.1.1", "location": "Loc-Yellow"})
+        y2_res = await client.post("/api/admin/hosts", json={"name": "Y2", "ip_address": "10.1.1.2", "location": "Loc-Yellow"})
+        y1_id = y1_res.json()["id"]
+        y2_id = y2_res.json()["id"]
+
+        r1_res = await client.post("/api/admin/hosts", json={"name": "R1", "ip_address": "10.2.1.1", "location": "Loc-Red"})
+        r2_res = await client.post("/api/admin/hosts", json={"name": "R2", "ip_address": "10.2.1.2", "location": "Loc-Red"})
+        r3_res = await client.post("/api/admin/hosts", json={"name": "R3", "ip_address": "10.2.1.3", "location": "Loc-Red"})
+        r4_res = await client.post("/api/admin/hosts", json={"name": "R4", "ip_address": "10.2.1.4", "location": "Loc-Red"})
+        r1_id = r1_res.json()["id"]
+        r2_id = r2_res.json()["id"]
+        r3_id = r3_res.json()["id"]
+        r4_id = r4_res.json()["id"]
+
+        now = int(time.time())
+
+        # Set status: Loc-Yellow 1/2 down (50%) -> alert_level == "yellow"
+        ping_engine.latest_host_status[y1_id] = PingResult(host_id=y1_id, is_up=True, rtt_ms=10.0, timestamp=now)
+        ping_engine.latest_host_status[y2_id] = PingResult(host_id=y2_id, is_up=False, rtt_ms=None, error_msg="Timeout", timestamp=now)
+
+        # Set status: Loc-Red 3/4 down (75%) -> alert_level == "red"
+        ping_engine.latest_host_status[r1_id] = PingResult(host_id=r1_id, is_up=True, rtt_ms=15.0, timestamp=now)
+        ping_engine.latest_host_status[r2_id] = PingResult(host_id=r2_id, is_up=False, rtt_ms=None, error_msg="Timeout", timestamp=now)
+        ping_engine.latest_host_status[r3_id] = PingResult(host_id=r3_id, is_up=False, rtt_ms=None, error_msg="Timeout", timestamp=now)
+        ping_engine.latest_host_status[r4_id] = PingResult(host_id=r4_id, is_up=False, rtt_ms=None, error_msg="Timeout", timestamp=now)
+
+        # Fetch /api/tree and verify alert levels
+        tree_res = await client.get("/api/tree")
+        assert tree_res.status_code == 200
+        tree_data = tree_res.json()
+        loc_map = {l["name"]: l for l in tree_data["locations"]}
+
+        assert loc_map["Loc-Yellow"]["alert_level"] == "yellow"
+        assert loc_map["Loc-Yellow"]["device_total"] == 2
+        assert loc_map["Loc-Yellow"]["device_down"] == 1
+        assert loc_map["Loc-Yellow"]["device_down_pct"] == 50.0
+
+        assert loc_map["Loc-Red"]["alert_level"] == "red"
+        assert loc_map["Loc-Red"]["device_total"] == 4
+        assert loc_map["Loc-Red"]["device_down"] == 3
+        assert loc_map["Loc-Red"]["device_down_pct"] == 75.0
+
+        # Insert historical polls into ping_history across multiple days
+        past_72h = now - (72 * 3600)
+        past_48h = now - (48 * 3600)
+        past_24h = now - (24 * 3600)
+
+        async with get_history_db() as db:
+            await db.execute("INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms, error_msg) VALUES (?, ?, ?, ?, ?)",
+                            (y1_id, past_72h, 1, 12.0, None))
+            await db.execute("INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms, error_msg) VALUES (?, ?, ?, ?, ?)",
+                            (y1_id, past_48h, 1, 14.0, None))
+            await db.execute("INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms, error_msg) VALUES (?, ?, ?, ?, ?)",
+                            (y1_id, past_24h, 0, None, "Timeout"))
+            await db.execute("INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms, error_msg) VALUES (?, ?, ?, ?, ?)",
+                            (y1_id, now - 60, 1, 11.5, None))
+            await db.commit()
+
+        # Query latest 48h (default)
+        t_res1 = await client.get(f"/api/hosts/{y1_id}/timeline")
+        assert t_res1.status_code == 200
+        tl1 = t_res1.json()["timeline"]
+        assert tl1["period_hours"] == 48
+        assert tl1["has_earlier"] is True
+        assert tl1["has_later"] is False
+        assert tl1["earliest_time"] == past_72h
+
+        # Query past block using end_time
+        t_res2 = await client.get(f"/api/hosts/{y1_id}/timeline?hours=48&end_time={past_24h}")
+        assert t_res2.status_code == 200
+        tl2 = t_res2.json()["timeline"]
+        assert tl2["period_hours"] == 48
+        assert tl2["end_time"] == past_24h
+        assert tl2["has_later"] is True
+
 
 
