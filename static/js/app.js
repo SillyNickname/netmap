@@ -32,6 +32,24 @@ let currentTimelineHours = 48;
 let currentTimelineEndTime = null;
 let currentDensity = localStorage.getItem("netmap_density") || "compact";
 
+let pinnedLocations = (function() {
+    try {
+        const val = localStorage.getItem("netmap_pinned_locations");
+        return val ? JSON.parse(val) : [];
+    } catch (e) {
+        return [];
+    }
+})();
+
+let collapsedLocations = (function() {
+    try {
+        const val = localStorage.getItem("netmap_collapsed_locations");
+        return val ? JSON.parse(val) : [];
+    } catch (e) {
+        return [];
+    }
+})();
+
 document.addEventListener("DOMContentLoaded", () => {
     initDensity();
     initLocationFilter();
@@ -354,6 +372,15 @@ function filterLocation(locName, updateHistory = true) {
     activeLocationFilter = locName || "all";
     localStorage.setItem("netmap_location_filter", activeLocationFilter);
 
+    // If selecting a specific location from the location bar, ensure it is uncollapsed so it's shown
+    if (activeLocationFilter !== "all") {
+        const idx = collapsedLocations.indexOf(activeLocationFilter);
+        if (idx !== -1) {
+            collapsedLocations.splice(idx, 1);
+            localStorage.setItem("netmap_collapsed_locations", JSON.stringify(collapsedLocations));
+        }
+    }
+
     if (updateHistory) {
         const url = new URL(window.location.href);
         if (activeLocationFilter === "all") {
@@ -366,6 +393,78 @@ function filterLocation(locName, updateHistory = true) {
     }
 
     loadTree(true);
+}
+
+function togglePinLocation(locName, e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const idx = pinnedLocations.indexOf(locName);
+    if (idx !== -1) {
+        pinnedLocations.splice(idx, 1);
+    } else {
+        pinnedLocations.push(locName);
+    }
+    localStorage.setItem("netmap_pinned_locations", JSON.stringify(pinnedLocations));
+    renderTree();
+}
+
+function toggleCollapseLocation(locName, e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const idx = collapsedLocations.indexOf(locName);
+    let isNowCollapsed = false;
+    if (idx !== -1) {
+        collapsedLocations.splice(idx, 1);
+        isNowCollapsed = false;
+    } else {
+        collapsedLocations.push(locName);
+        isNowCollapsed = true;
+    }
+    localStorage.setItem("netmap_collapsed_locations", JSON.stringify(collapsedLocations));
+
+    // Smooth DOM toggle
+    const sectionEl = document.querySelector(`.location-section[data-location="${CSS.escape(locName)}"]`);
+    if (sectionEl) {
+        if (isNowCollapsed) {
+            sectionEl.classList.add("collapsed");
+        } else {
+            sectionEl.classList.remove("collapsed");
+        }
+        const iconEl = sectionEl.querySelector(".location-collapse-icon");
+        if (iconEl) {
+            iconEl.innerText = isNowCollapsed ? "▶" : "▼";
+        }
+    } else {
+        renderTree();
+    }
+}
+
+function collapseAllLocations() {
+    const locNamesOnPage = Array.from(document.querySelectorAll(".location-section"))
+        .map(s => s.getAttribute("data-location"))
+        .filter(Boolean);
+    locNamesOnPage.forEach(n => {
+        if (!collapsedLocations.includes(n)) {
+            collapsedLocations.push(n);
+        }
+    });
+    localStorage.setItem("netmap_collapsed_locations", JSON.stringify(collapsedLocations));
+    document.querySelectorAll(".location-section").forEach(sec => {
+        sec.classList.add("collapsed");
+        const icon = sec.querySelector(".location-collapse-icon");
+        if (icon) icon.innerText = "▶";
+    });
+}
+
+function expandAllLocations() {
+    const locNamesOnPage = Array.from(document.querySelectorAll(".location-section"))
+        .map(s => s.getAttribute("data-location"))
+        .filter(Boolean);
+    collapsedLocations = collapsedLocations.filter(n => !locNamesOnPage.includes(n));
+    localStorage.setItem("netmap_collapsed_locations", JSON.stringify(collapsedLocations));
+    document.querySelectorAll(".location-section").forEach(sec => {
+        sec.classList.remove("collapsed");
+        const icon = sec.querySelector(".location-collapse-icon");
+        if (icon) icon.innerText = "▼";
+    });
 }
 
 // ----------------- Left-to-Right Tree Rendering -----------------
@@ -388,38 +487,84 @@ function renderTree() {
         return;
     }
 
-    let html = "";
-    currentLocations.forEach(loc => {
-        const locHref = `${APP_BASE}/?location=${encodeURIComponent(loc.name)}`;
-        html += `
-            <div class="location-section">
-                <div class="location-header">
-                    <div class="location-title">
-                        <a href="${locHref}" data-location="${escapeHtml(loc.name)}" onclick="event.preventDefault(); filterLocation(this.getAttribute('data-location'));" style="color: inherit; text-decoration: none; cursor: pointer;">📍 ${escapeHtml(loc.name)}</a>
-                        <span class="location-badge">${loc.total_count} ${t("hosts_count_suffix")}</span>
-                    </div>
-                    <div style="display: flex; gap: 14px; font-size: 0.8rem; font-family: var(--font-mono);">
-                        <span style="color: var(--up-color);">● ${loc.up_count} ${t("status_up")}</span>
-                        ${loc.degraded_count > 0 ? `<span style="color: var(--degraded-color);">● ${loc.degraded_count} ${t("status_partially_up")}</span>` : ''}
-                        <span style="color: var(--down-color);">● ${loc.down_count} ${t("status_down")}</span>
-                    </div>
-                </div>
-                <div class="tree-container">
-        `;
+    // Sort locations: pinned locations first, then alphabetical
+    const sortedLocations = [...currentLocations].sort((a, b) => {
+        const aPinned = pinnedLocations.includes(a.name);
+        const bPinned = pinnedLocations.includes(b.name);
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        if (aPinned && bPinned) {
+            return pinnedLocations.indexOf(a.name) - pinnedLocations.indexOf(b.name);
+        }
+        return (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+    });
 
+    let html = "";
+    sortedLocations.forEach(loc => {
+        const isPinned = pinnedLocations.includes(loc.name);
+        const isCollapsed = collapsedLocations.includes(loc.name);
+        const devTotal = loc.device_total !== undefined ? loc.device_total : loc.total_count;
+        const devUp = loc.device_up !== undefined ? loc.device_up : loc.up_count;
+        const devDown = loc.device_down !== undefined ? loc.device_down : loc.down_count;
+        const devDegraded = loc.degraded_count || 0;
+
+        let alertBadge = "";
+        let alertLevel = loc.alert_level;
+        const downPct = loc.device_down_pct !== undefined ? loc.device_down_pct : (devTotal > 0 ? (devDown / devTotal) * 100 : 0);
+        if (!alertLevel && devTotal > 0 && devDown > 0) {
+            if (downPct >= 75) alertLevel = "red";
+            else if (downPct >= 50) alertLevel = "yellow";
+        }
+        if (alertLevel) {
+            const warnTitle = (alertLevel === "red" ? t("loc_warning_red_title") : t("loc_warning_yellow_title"))
+                .replace("{down}", devDown)
+                .replace("{total}", devTotal)
+                .replace("{pct}", downPct);
+            alertBadge = `
+                <span class="loc-warning-badge badge-${alertLevel}" title="${escapeHtml(warnTitle)}">
+                    <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                    </svg>
+                </span>
+            `;
+        }
+
+        let rootsHtml = "";
         if (loc.roots.length === 0) {
-            html += `<div style="color: var(--text-dim); font-size: 0.85rem; padding: 12px;">${t("no_roots")}</div>`;
+            rootsHtml = `<div style="color: var(--text-dim); font-size: 0.85rem; padding: 12px;">${t("no_roots")}</div>`;
         } else {
-            loc.roots.forEach(rootNode => {
-                html += `
-                    <div class="tree-row">
-                        ${renderTreeNodeBranch(rootNode)}
-                    </div>
-                `;
-            });
+            rootsHtml = loc.roots.map(rootNode => `
+                <div class="tree-row">
+                    ${renderTreeNodeBranch(rootNode)}
+                </div>
+            `).join("");
         }
 
         html += `
+            <div class="location-section ${isCollapsed ? 'collapsed' : ''} ${isPinned ? 'pinned-location' : ''}" 
+                 data-location="${escapeHtml(loc.name)}">
+                <div class="location-header" onclick="toggleCollapseLocation('${escapeHtml(loc.name)}', event)">
+                    <div class="location-title">
+                        <button class="loc-pin-btn ${isPinned ? 'pinned' : ''}" 
+                                onclick="togglePinLocation('${escapeHtml(loc.name)}', event)" 
+                                title="${isPinned ? t('unpin_tooltip') : t('pin_tooltip')}">
+                            📌
+                        </button>
+                        <span class="location-collapse-icon">${isCollapsed ? '▶' : '▼'}</span>
+                        <span class="location-name-text">${escapeHtml(loc.name)}</span>
+                        <span class="location-badge">${devTotal} ${t("hosts_count_suffix")}</span>
+                        ${alertBadge}
+                    </div>
+                    <div class="location-stats">
+                        <span style="color: var(--up-color);">● ${devUp} ${t("status_up")}</span>
+                        ${devDegraded > 0 ? `<span style="color: var(--degraded-color);">● ${devDegraded} ${t("status_partially_up")}</span>` : ''}
+                        <span style="color: var(--down-color);">● ${devDown} ${t("status_down")}</span>
+                    </div>
+                </div>
+                <div class="tree-container-wrapper">
+                    <div class="tree-container">
+                        ${rootsHtml}
+                    </div>
                 </div>
             </div>
         `;

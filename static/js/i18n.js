@@ -25,6 +25,11 @@ const TRANSLATIONS = {
         "density_label": "Modo:",
         "density_compact": "Compacto (20px)",
         "density_tall": "Expandido",
+        "locations_collapse_label": "Locais:",
+        "btn_collapse_all": "⇲ Recolher Todos",
+        "btn_expand_all": "⇱ Expandir Todos",
+        "pin_tooltip": "Fixar no topo",
+        "unpin_tooltip": "Desafixar do topo",
 
         // Tree
         "loading_hierarchy": "Carregando topologia da rede...",
@@ -243,6 +248,11 @@ const TRANSLATIONS = {
         "density_label": "View:",
         "density_compact": "Compact (20px)",
         "density_tall": "Comfortable",
+        "locations_collapse_label": "Locations:",
+        "btn_collapse_all": "⇲ Collapse All",
+        "btn_expand_all": "⇱ Expand All",
+        "pin_tooltip": "Pin to top",
+        "unpin_tooltip": "Unpin from top",
 
         // Tree
         "loading_hierarchy": "Loading network hierarchy...",

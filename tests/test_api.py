@@ -469,5 +469,17 @@ async def test_location_warning_levels_and_timeline_pagination():
         assert tl2["end_time"] == past_24h
         assert tl2["has_later"] is True
 
+@pytest.mark.asyncio
+async def test_index_page_collapse_controls():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/")
+        assert res.status_code == 200
+        html = res.text
+        assert "btn-collapse-all" in html
+        assert "btn-expand-all" in html
+        assert "collapseAllLocations" in html
+        assert "expandAllLocations" in html
+
 
 
