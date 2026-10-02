@@ -620,11 +620,12 @@ function renderTimelineData(data) {
     const rangeDisplay = `${formatDt(startDt)} ➔ ${formatDt(endDt)}`;
 
     // Time Navigation Handlers
+    const nowTs = Math.floor(Date.now() / 1000);
     const earliestTarget = earliestTs ? (earliestTs + currentTimelineHours * 3600) : null;
-    const back48hTarget = endTs - (48 * 3600);
-    const back24hTarget = endTs - (24 * 3600);
-    const fwd24hTarget = endTs + (24 * 3600);
-    const fwd48hTarget = endTs + (48 * 3600);
+    const back12hTarget = endTs - (12 * 3600);
+    const back6hTarget = endTs - (6 * 3600);
+    const fwd6hTarget = (endTs + (6 * 3600) >= nowTs) ? null : (endTs + (6 * 3600));
+    const fwd12hTarget = (endTs + (12 * 3600) >= nowTs) ? null : (endTs + (12 * 3600));
 
     // 1. Time Navigation Toolbar
     const navToolbarHtml = `
@@ -636,14 +637,14 @@ function renderTimelineData(data) {
                     ⏮ ${t("time_earliest")}
                 </button>
                 <button class="btn btn-outline btn-xs" ${!hasEarlier ? 'disabled' : ''} 
-                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${back48hTarget})"
-                    title="${t("time_back_48h")}">
-                    ◀◀ -48h
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${back12hTarget})"
+                    title="${t("time_back_12h")}">
+                    ◀ -12h
                 </button>
                 <button class="btn btn-outline btn-xs" ${!hasEarlier ? 'disabled' : ''} 
-                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${back24hTarget})"
-                    title="${t("time_back_24h")}">
-                    ◀ -24h
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${back6hTarget})"
+                    title="${t("time_back_6h")}">
+                    ◀ -6h
                 </button>
             </div>
             <div class="timeline-nav-range">
@@ -651,14 +652,14 @@ function renderTimelineData(data) {
             </div>
             <div class="timeline-nav-group">
                 <button class="btn btn-outline btn-xs" ${!hasLater ? 'disabled' : ''} 
-                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${fwd24hTarget})"
-                    title="${t("time_fwd_24h")}">
-                    +24h ▶
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${fwd6hTarget})"
+                    title="${t("time_fwd_6h")}">
+                    +6h ▶
                 </button>
                 <button class="btn btn-outline btn-xs" ${!hasLater ? 'disabled' : ''} 
-                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${fwd48hTarget})"
-                    title="${t("time_fwd_48h")}">
-                    +48h ▶▶
+                    onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, ${fwd12hTarget})"
+                    title="${t("time_fwd_12h")}">
+                    +12h ▶
                 </button>
                 <button class="btn btn-outline btn-xs" ${!hasLater ? 'disabled' : ''} 
                     onclick="openTimelineModal(${host.id}, ${currentTimelineHours}, null)"
