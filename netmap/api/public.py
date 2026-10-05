@@ -1,7 +1,7 @@
 import time
 import asyncio
 from typing import Dict, List, Any, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Path
 from netmap.db import get_hosts_db
 from netmap.config import config
 from netmap.ping_engine import ping_engine
@@ -37,7 +37,7 @@ async def get_system_status():
     }
 
 @router.get("/tree")
-async def get_tree_data(location_filter: Optional[str] = Query(None)):
+async def get_tree_data(location_filter: Optional[str] = Query(None, max_length=100)):
     """
     Returns hierarchical network tree data grouped by Location.
     When a grouping is set, hosts in that grouping are replaced by the Grouping name.
@@ -381,7 +381,7 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
 async def get_host_timeline(
     host_id: int, 
     hours: Optional[int] = Query(48, ge=1, le=48),
-    end_time: Optional[int] = Query(None)
+    end_time: Optional[int] = Query(None, ge=0)
 ):
     async with get_hosts_db() as db:
         query = """
@@ -417,7 +417,10 @@ async def get_host_timeline(
     }
 
 @router.get("/groups/{group_name}/timeline")
-async def get_group_timeline(group_name: str, hours: Optional[int] = Query(None)):
+async def get_group_timeline(
+    group_name: str = Path(..., max_length=100),
+    hours: Optional[int] = Query(None, ge=1, le=48)
+):
     async with get_hosts_db() as db:
         async with db.execute("SELECT name, aggregation_mode, description FROM groups WHERE name = ?", (group_name,)) as cur:
             grp = await cur.fetchone()

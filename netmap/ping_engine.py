@@ -2,7 +2,7 @@ import asyncio
 import re
 import time
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from netmap.config import config
 from netmap.db import get_hosts_db, get_history_db
 
@@ -15,6 +15,11 @@ RTT_REGEX = re.compile(r'time=([\d.]+)\s*ms')
 RTT_SUMMARY_REGEX = re.compile(r'rtt min/avg/max/mdev = [\d.]+/([\d.]+)/')
 
 def is_valid_target(target: str) -> bool:
+    if not target or not isinstance(target, str):
+        return False
+    if any(c.isspace() for c in target):
+        return False
+    target = target.strip()
     if not target or target.startswith("-") or len(target) > 253:
         return False
     try:
@@ -48,6 +53,7 @@ class PingEngine:
         self._stop_event = asyncio.Event()
         self.last_poll_time: Optional[int] = None
         self.is_polling: bool = False
+        self._last_prune_time: int = 0
         
         self.latest_host_status: Dict[int, PingResult] = {}
         self.latest_group_status: Dict[str, Dict[str, Any]] = {}
@@ -86,8 +92,18 @@ class PingEngine:
                 else:
                     return PingResult(host_id=host_id, is_up=False, error_msg="Host unreachable or timed out")
             except asyncio.TimeoutError:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except Exception:
+                    pass
                 return PingResult(host_id=host_id, is_up=False, error_msg="Ping subprocess execution timed out")
             except Exception as e:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except Exception:
+                    pass
                 return PingResult(host_id=host_id, is_up=False, error_msg=str(e))
 
     async def execute_poll(self) -> Dict[str, Any]:
@@ -139,6 +155,12 @@ class PingEngine:
                 for res in results:
                     self.latest_host_status[res.host_id] = res
 
+                # Evict deactivated or deleted hosts to keep memory lean
+                active_host_ids = {h["id"] for h in hosts}
+                stale_ids = [hid for hid in self.latest_host_status if hid not in active_host_ids]
+                for hid in stale_ids:
+                    self.latest_host_status.pop(hid, None)
+
                 group_members: Dict[str, List[PingResult]] = {}
                 for h in hosts:
                     grp = h.get("grouping")
@@ -167,7 +189,9 @@ class PingEngine:
                     }
                 self.latest_group_status = new_group_status
 
-                await self.prune_history()
+                # Prune history periodically (hourly) rather than on every poll
+                if now_ts - self._last_prune_time >= 3600:
+                    await self.prune_history()
 
                 self.last_poll_time = now_ts
                 duration = round(time.time() - start_time, 2)
@@ -183,6 +207,7 @@ class PingEngine:
     async def prune_history(self) -> int:
         retention_secs = config.retention_hours * 3600
         cutoff = int(time.time()) - retention_secs
+        self._last_prune_time = int(time.time())
         try:
             async with get_history_db() as db:
                 cursor = await db.execute("DELETE FROM ping_history WHERE timestamp < ?", (cutoff,))
@@ -232,26 +257,29 @@ class PingEngine:
             return {}
         
         thirty_mins_ago = int(time.time()) - 1800
-        placeholders = ",".join("?" for _ in host_ids)
-        query = f"""
-            SELECT host_id, timestamp, is_up, rtt_ms
-            FROM ping_history
-            WHERE host_id IN ({placeholders}) AND timestamp >= ?
-            ORDER BY timestamp ASC
-        """
-        params = list(host_ids) + [thirty_mins_ago]
-        
         result_map: Dict[int, List[Dict[str, Any]]] = {hid: [] for hid in host_ids}
+        
+        chunk_size = 500
         async with get_history_db() as db:
-            async with db.execute(query, params) as cursor:
-                for row in await cursor.fetchall():
-                    hid = row["host_id"]
-                    if hid in result_map:
-                        result_map[hid].append({
-                            "t": row["timestamp"],
-                            "up": row["is_up"] == 1,
-                            "rtt": row["rtt_ms"]
-                        })
+            for i in range(0, len(host_ids), chunk_size):
+                chunk = host_ids[i:i + chunk_size]
+                placeholders = ",".join("?" for _ in chunk)
+                query = f"""
+                    SELECT host_id, timestamp, is_up, rtt_ms
+                    FROM ping_history
+                    WHERE host_id IN ({placeholders}) AND timestamp >= ?
+                    ORDER BY timestamp ASC
+                """
+                params = list(chunk) + [thirty_mins_ago]
+                async with db.execute(query, params) as cursor:
+                    for row in await cursor.fetchall():
+                        hid = row["host_id"]
+                        if hid in result_map:
+                            result_map[hid].append({
+                                "t": row["timestamp"],
+                                "up": row["is_up"] == 1,
+                                "rtt": row["rtt_ms"]
+                            })
         return result_map
 
     async def get_6h_downtime_stats(self, host_ids: List[int]) -> Dict[int, Dict[str, Any]]:
@@ -259,33 +287,36 @@ class PingEngine:
             return {}
         
         six_hours_ago = int(time.time()) - (6 * 3600)
-        placeholders = ",".join("?" for _ in host_ids)
-        query = f"""
-            SELECT host_id,
-                   COUNT(*) as total_polls,
-                   SUM(CASE WHEN is_up = 0 THEN 1 ELSE 0 END) as down_polls
-            FROM ping_history
-            WHERE host_id IN ({placeholders}) AND timestamp >= ?
-            GROUP BY host_id
-        """
-        params = list(host_ids) + [six_hours_ago]
-        
         result_map: Dict[int, Dict[str, Any]] = {
             hid: {"total_polls": 0, "down_polls": 0, "downtime_pct": 0.0}
             for hid in host_ids
         }
+        
+        chunk_size = 500
         async with get_history_db() as db:
-            async with db.execute(query, params) as cursor:
-                for row in await cursor.fetchall():
-                    hid = row["host_id"]
-                    tot = row["total_polls"] or 0
-                    down = row["down_polls"] or 0
-                    pct = round((down / tot) * 100, 1) if tot > 0 else 0.0
-                    result_map[hid] = {
-                        "total_polls": tot,
-                        "down_polls": down,
-                        "downtime_pct": pct
-                    }
+            for i in range(0, len(host_ids), chunk_size):
+                chunk = host_ids[i:i + chunk_size]
+                placeholders = ",".join("?" for _ in chunk)
+                query = f"""
+                    SELECT host_id,
+                           COUNT(*) as total_polls,
+                           SUM(CASE WHEN is_up = 0 THEN 1 ELSE 0 END) as down_polls
+                    FROM ping_history
+                    WHERE host_id IN ({placeholders}) AND timestamp >= ?
+                    GROUP BY host_id
+                """
+                params = list(chunk) + [six_hours_ago]
+                async with db.execute(query, params) as cursor:
+                    for row in await cursor.fetchall():
+                        hid = row["host_id"]
+                        tot = row["total_polls"] or 0
+                        down = row["down_polls"] or 0
+                        pct = round((down / tot) * 100, 1) if tot > 0 else 0.0
+                        result_map[hid] = {
+                            "total_polls": tot,
+                            "down_polls": down,
+                            "downtime_pct": pct
+                        }
         return result_map
 
     async def get_host_history_timeline(self, host_id: int, hours: Optional[int] = None, end_time: Optional[int] = None) -> Dict[str, Any]:

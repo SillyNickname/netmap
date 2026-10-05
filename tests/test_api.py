@@ -564,3 +564,55 @@ async def test_device_and_group_instability():
 
         assert nodes[h4]["instability_level"] == "red"
         assert nodes[h4]["downtime_6h_pct"] == 60.0
+
+@pytest.mark.asyncio
+async def test_security_admin_lockout_protection():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+        users_res = await client.get("/api/admin/users")
+        users = users_res.json()["users"]
+        admin_user = next(u for u in users if u["username"] == "admin")
+
+        # 1. Self deletion is blocked
+        del_self = await client.delete(f"/api/admin/users/{admin_user['id']}")
+        assert del_self.status_code == 400
+        assert "Cannot delete your own user account" in del_self.json()["detail"]
+
+        # 2. Cannot demote the sole admin to operator
+        demote_res = await client.put(f"/api/admin/users/{admin_user['id']}", json={"role": "operator"})
+        assert demote_res.status_code == 400
+        assert "Cannot demote the last administrator" in demote_res.json()["detail"]
+
+        # 3. Create a second admin
+        create_res = await client.post("/api/admin/users", json={"username": "admin2", "password": "password123", "role": "admin"})
+        assert create_res.status_code == 200
+
+        users = (await client.get("/api/admin/users")).json()["users"]
+        admin2 = next(u for u in users if u["username"] == "admin2")
+
+        # Now demoting admin2 is permitted because admin1 exists
+        demote2 = await client.put(f"/api/admin/users/{admin2['id']}", json={"role": "operator"})
+        assert demote2.status_code == 200
+
+        # And deleting admin2 is permitted
+        del2 = await client.delete(f"/api/admin/users/{admin2['id']}")
+        assert del2.status_code == 200
+
+@pytest.mark.asyncio
+async def test_security_headers_and_csv_limits():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Check security headers on root
+        res = await client.get("/")
+        assert res.status_code == 200
+        assert res.headers.get("x-content-type-options") == "nosniff"
+        assert res.headers.get("x-frame-options") == "SAMEORIGIN"
+        assert res.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+
+        # Check CSV size limit
+        await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+        oversized_csv = "name,ip_address,location\n" + ("host,1.1.1.1,loc\n" * 60000)
+        csv_res = await client.post("/api/admin/csv/import", data={"csv_text": oversized_csv})
+        assert csv_res.status_code in (400, 413)
+

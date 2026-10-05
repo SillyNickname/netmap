@@ -1,7 +1,6 @@
 import os
-from pathlib import Path
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
 from netmap.auth import require_admin, hash_password
 from netmap.config import config
 from netmap.db import get_hosts_db, get_history_db
@@ -257,6 +256,17 @@ async def create_user(user_in: UserCreate):
 @router.put("/users/{user_id}")
 async def update_user(user_id: int, user_in: UserUpdate):
     async with get_hosts_db() as db:
+        async with db.execute("SELECT id, role FROM users WHERE id = ?", (user_id,)) as cursor:
+            target_user = await cursor.fetchone()
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if target_user["role"] == "admin" and user_in.role == "operator":
+            async with db.execute("SELECT COUNT(*) as c FROM users WHERE role = 'admin'") as cursor:
+                admin_count = (await cursor.fetchone())["c"]
+            if admin_count <= 1:
+                raise HTTPException(status_code=400, detail="Cannot demote the last administrator account")
+
         updates = []
         params = []
         if user_in.password:
@@ -277,11 +287,22 @@ async def delete_user(user_id: int, admin_user: dict = Depends(require_admin)):
     if admin_user["id"] == user_id:
         raise HTTPException(status_code=400, detail="Cannot delete your own user account")
     async with get_hosts_db() as db:
+        async with db.execute("SELECT id, role FROM users WHERE id = ?", (user_id,)) as cursor:
+            target_user = await cursor.fetchone()
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if target_user["role"] == "admin":
+            async with db.execute("SELECT COUNT(*) as c FROM users WHERE role = 'admin'") as cursor:
+                admin_count = (await cursor.fetchone())["c"]
+            if admin_count <= 1:
+                raise HTTPException(status_code=400, detail="Cannot delete the last administrator account")
         await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
         await db.commit()
     return {"success": True, "message": "User deleted successfully"}
 
 # ----------------- CSV IMPORT & EXPORT -----------------
+
+MAX_CSV_SIZE = 10 * 1024 * 1024  # 10 MB maximum
 
 @router.post("/csv/import")
 async def import_csv_file(
@@ -291,9 +312,13 @@ async def import_csv_file(
 ):
     content = ""
     if file:
-        content_bytes = await file.read()
+        content_bytes = await file.read(MAX_CSV_SIZE + 1)
+        if len(content_bytes) > MAX_CSV_SIZE:
+            raise HTTPException(status_code=413, detail="CSV file too large (maximum size 10 MB)")
         content = content_bytes.decode("utf-8", errors="ignore")
     elif csv_text:
+        if len(csv_text.encode("utf-8")) > MAX_CSV_SIZE:
+            raise HTTPException(status_code=413, detail="CSV content too large (maximum size 10 MB)")
         content = csv_text
     else:
         raise HTTPException(status_code=400, detail="No CSV file or text provided")

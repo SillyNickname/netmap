@@ -1,6 +1,6 @@
 import csv
 import io
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 from netmap.db import get_hosts_db
 from netmap.ping_engine import is_valid_target
 
@@ -64,13 +64,13 @@ async def import_hosts_from_csv(csv_text: str, purge_existing: bool = False) -> 
             group_mode = "any"
 
         rows.append({
-            "name": name,
-            "ip_address": ip,
-            "location": location,
-            "parent_raw": parent,
-            "grouping": grouping if grouping else None,
+            "name": name[:100],
+            "ip_address": ip[:253],
+            "location": location[:100],
+            "parent_raw": parent[:100] if parent else "",
+            "grouping": (grouping[:100] if grouping else None),
             "group_mode": group_mode,
-            "description": desc
+            "description": desc[:1000]
         })
 
     if not rows and errors:

@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from pydantic import BaseModel, Field
 
 class HostCreate(BaseModel):
@@ -6,8 +6,8 @@ class HostCreate(BaseModel):
     ip_address: str = Field(..., min_length=1, max_length=255)
     location: str = Field(..., min_length=1, max_length=100)
     parent_id: Optional[int] = None
-    grouping: Optional[str] = None
-    description: Optional[str] = ""
+    grouping: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = Field("", max_length=1000)
     is_active: bool = True
 
 class HostUpdate(BaseModel):
@@ -15,36 +15,36 @@ class HostUpdate(BaseModel):
     ip_address: Optional[str] = Field(None, min_length=1, max_length=255)
     location: Optional[str] = Field(None, min_length=1, max_length=100)
     parent_id: Optional[int] = None
-    grouping: Optional[str] = None
-    description: Optional[str] = None
+    grouping: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
     is_active: Optional[bool] = None
 
 class GroupCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     aggregation_mode: str = Field("any", pattern="^(any|all)$")
-    description: Optional[str] = ""
+    description: Optional[str] = Field("", max_length=1000)
 
 class GroupUpdate(BaseModel):
     aggregation_mode: Optional[str] = Field(None, pattern="^(any|all)$")
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=1000)
 
 class UserLogin(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=1, max_length=128)
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=2, max_length=50)
-    password: str = Field(..., min_length=4)
+    password: str = Field(..., min_length=4, max_length=128)
     role: str = Field("operator", pattern="^(admin|operator)$")
 
 class UserUpdate(BaseModel):
-    password: Optional[str] = None
+    password: Optional[str] = Field(None, min_length=4, max_length=128)
     role: Optional[str] = Field(None, pattern="^(admin|operator)$")
 
 class SettingsUpdate(BaseModel):
-    server_host: Optional[str] = None
+    server_host: Optional[str] = Field(None, max_length=255)
     server_port: Optional[int] = Field(None, ge=1, le=65535)
-    url_prefix: Optional[str] = None
+    url_prefix: Optional[str] = Field(None, max_length=255)
     interval_seconds: Optional[int] = Field(None, ge=5, le=86400)
     ping_threads: Optional[int] = Field(None, ge=1, le=500)
     ping_timeout: Optional[int] = Field(None, ge=1, le=30)

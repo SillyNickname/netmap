@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from netmap.auth import require_authenticated
 from netmap.ping_engine import ping_engine
 

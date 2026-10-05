@@ -1,12 +1,12 @@
 # NetMap - Guia de Implantação no Ubuntu Server / Deployment Guide
 
-Este guia detalha o processo de instalação e implantação do **NetMap** em servidores **Ubuntu** (Ubuntu 20.04 LTS, 22.04 LTS, 24.04 LTS e superiores), utilizando o gerenciador de pacotes nativo **`apt`**, ambientes virtuais do **Python (`venv`)** e **`systemd`** para execução em segundo plano com inicialização automática.
+Este guia detalha o processo de instalação, configuração e implantação em produção do **NetMap** em servidores **Ubuntu** (Ubuntu 20.04 LTS, 22.04 LTS, 24.04 LTS e superiores), utilizando o gerenciador de pacotes nativo **`apt`**, ambientes virtuais isolados do **Python (`venv`)**, **`systemd`** para execução contínua em segundo plano e **Nginx** para proxy reverso com SSL/TLS e suporte a subdiretório.
 
 ---
 
 ## ⚡ Método 1: Instalação Automática (Recomendado)
 
-O script [`install.sh`](file:///home/kajita/git/netmap/install.sh) automatiza 100% da instalação: instala os pacotes do sistema via `apt`, cria o ambiente virtual isolado, instala as bibliotecas via `pip` e registra o serviço no `systemd`.
+O script [`install.sh`](file:///Extra/git/netmap/install.sh) automatiza 100% da instalação: instala os pacotes do sistema via `apt`, cria o ambiente virtual isolado, instala as bibliotecas via `pip` e registra o serviço no `systemd`.
 
 ### 1. Clonar ou Transferir os Arquivos para o Servidor Ubuntu
 ```bash
@@ -31,7 +31,7 @@ O instalador irá:
 2. Criar a estrutura em `/opt/netmap`.
 3. Criar o ambiente virtual Python em `/opt/netmap/.venv`.
 4. Instalar todas as dependências (`fastapi`, `uvicorn`, `aiosqlite`, `bcrypt`, etc.).
-5. Criar e iniciar o serviço de sistema `netmap.service`.
+5. Criar e iniciar o serviço de sistema `netmap.service` com limites otimizados de descritores de arquivo.
 
 ---
 
@@ -80,7 +80,7 @@ sudo /opt/netmap/.venv/bin/python3 -m pip install -r /opt/netmap/requirements.tx
 > source .venv/bin/activate
 > python3 run.py
 > ```
-> *(Nota: O script `run.py` também detecta e ativa automaticamente o `.venv` local caso você o execute no diretório do projeto).*
+> *(Nota: O script `run.py` detecta e ativa automaticamente o `.venv` local caso você o execute no diretório do projeto).*
 
 ### Passo 4: Registrar o Serviço no `systemd`
 Crie o arquivo de serviço `/etc/systemd/system/netmap.service`:
@@ -99,6 +99,7 @@ ExecStart=/opt/netmap/.venv/bin/python3 /opt/netmap/run.py
 Restart=always
 RestartSec=5s
 
+# Process security and file limits
 LimitNOFILE=65536
 Environment=PYTHONUNBUFFERED=1
 StandardOutput=journal
@@ -130,11 +131,11 @@ sudo ufw reload
 
 ## 🌐 Configuração com Nginx (Proxy Reverso & HTTPS)
 
-O NetMap foi desenvolvido para funcionar tanto na raiz de um domínio (`https://netmap.exemplo.com/`) quanto em um **subdiretório compartilhado** (ex: `https://servidor.exemplo.com/netmap/`).
+O NetMap foi desenvolvido com suporte nativo a execução na raiz de um domínio (`https://netmap.exemplo.com/`) ou em um **subdiretório compartilhado** (ex: `https://servidor.exemplo.com/netmap/`).
 
 ### Cenário A: Executar sob um Subdiretório (ex: `/netmap/`)
 
-Para hospedar o NetMap sob um subcaminho como `https://<hostname>/netmap/` conectado a `http://<host_ip>:8080/`:
+Para hospedar o NetMap sob um subcaminho como `https://<hostname>/netmap/` conectado a `http://127.0.0.1:8080/`:
 
 Adicione o bloco abaixo dentro do seu bloco `server { ... }` existente no Nginx:
 
@@ -155,7 +156,7 @@ location /netmap/ {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
-    # Informa ao NetMap o prefixo do subdiretório
+    # Informa ao NetMap o prefixo do subdiretório (ajusta links, APIs, assets e cookies)
     proxy_set_header X-Forwarded-Prefix /netmap;
 
     # Suporte a HTTP/1.1 e WebSockets
@@ -163,14 +164,14 @@ location /netmap/ {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
 
-    # Timeouts recomendados para sondagens de longa duração
+    # Timeouts recomendados
     proxy_connect_timeout 60s;
     proxy_read_timeout 120s;
 }
 ```
 
 > **Como funciona:**
-> 1. O cabeçalho `X-Forwarded-Prefix /netmap` faz com que o NetMap ajuste dinamicamente todos os links de páginas, APIs (`/netmap/api/...`), arquivos estáticos (`/netmap/static/...`), exportação CSV e cookies de autenticação (`Path=/netmap`).
+> 1. O cabeçalho `X-Forwarded-Prefix /netmap` faz com que o middleware ASGI do NetMap ajuste dinamicamente todos os links de páginas, APIs (`/netmap/api/...`), arquivos estáticos (`/netmap/static/...`), exportação CSV e cookies de sessão (`Path=/netmap`).
 > 2. Opcionalmente, você também pode configurar `url_prefix = /netmap` no arquivo `netmap.cfg` (ou na aba de Configurações no painel de administração).
 
 ---
@@ -183,7 +184,7 @@ Crie `/etc/nginx/sites-available/netmap`:
 ```nginx
 server {
     listen 80;
-    server_name netmap.seu-dominio.com; # ou o IP do servidor
+    server_name netmap.seu-dominio.com;
 
     location / {
         proxy_pass http://127.0.0.1:8080/;
@@ -207,11 +208,40 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### (Opcional) Gerar Certificado SSL Gratuito com Certbot
+### Gerar Certificado SSL Gratuito com Certbot (Let's Encrypt)
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d netmap.seu-dominio.com
 ```
+
+---
+
+## 🔒 Checklist de Segurança em Produção
+
+1. **Alterar as Credenciais Padrão**:
+   - Acesse `http://<IP_DO_SERVIDOR>:8080/admin` e faça login com `admin` / `admin123`.
+   - Navegue até a aba **Usuários** e atualize a senha da conta `admin` e da conta `operator`.
+   - O sistema possui proteção nativa contra bloqueio acidental: impede a exclusão ou rebaixamento da última conta de administrador.
+
+2. **Chave Secreta (`secret_key`)**:
+   - No arquivo `netmap.cfg`, altere o valor de `secret_key` para uma string aleatória longa.
+
+3. **Validação e Limites de Entrada**:
+   - O NetMap valida rigorosamente todos os endereços IP e hostnames com regex FQDN e analisador IPv4/IPv6, rejeitando caracteres de controle e injeções de comando.
+   - O envio de arquivos CSV é limitado a 10MB para prevenir sobrecarga de memória.
+   - Respostas HTTP incluem cabeçalhos de segurança automáticos:
+     - `X-Content-Type-Options: nosniff`
+     - `X-Frame-Options: SAMEORIGIN`
+     - `Referrer-Policy: strict-origin-when-cross-origin`
+
+4. **Gerenciamento de Recursos & Banco de Dados**:
+   - Os bancos de dados SQLite utilizam o modo **WAL (Write-Ahead Logging)** para alto rendimento com leituras concorrentes sem travar escritas.
+   - A limpeza de retenção do histórico (`DELETE FROM ping_history WHERE timestamp < cutoff`) é executada automaticamente **uma vez por hora**, poupando ciclos de I/O em disco.
+   - Para recompactar os arquivos de banco de dados caso necessário (após exclusão em massa):
+     ```bash
+     sqlite3 /opt/netmap/data/hosts.db "VACUUM;"
+     sqlite3 /opt/netmap/data/history.db "VACUUM;"
+     ```
 
 ---
 
@@ -224,33 +254,44 @@ sudo certbot --nginx -d netmap.seu-dominio.com
 | **Parar Serviço** | `sudo systemctl stop netmap` |
 | **Iniciar Serviço** | `sudo systemctl start netmap` |
 | **Ver Logs em Tempo Real** | `sudo journalctl -u netmap -f` |
+| **Verificar Últimos Erros** | `sudo journalctl -u netmap -e -p err` |
 
 ---
 
 ## 💾 Backup e Restauração
 
-Todos os dados persistentes ficam contidos em dois arquivos:
-1. `data/hosts.db` (Inventário, topologia, grupos e usuários)
-2. `data/history.db` (Série temporal de histórico de pings)
-3. `netmap.cfg` (Configurações do sistema)
+Todos os dados e configurações do NetMap estão armazenados em três locais:
+1. `data/hosts.db` (Inventário, hierarquia da topologia, grupos e contas de usuário)
+2. `data/history.db` (Série temporal das métricas de disponibilidade e latência)
+3. `netmap.cfg` (Configurações do servidor, tempos de ping e retenção)
 
-Para fazer backup:
+### Criar Backup
 ```bash
-sudo tar -czvf netmap-backup-$(date +%F).tar.gz /opt/netmap/data /opt/netmap/netmap.cfg
+sudo tar -czvf /backup/netmap-backup-$(date +%F).tar.gz -C /opt/netmap data netmap.cfg
+```
+
+### Restaurar Backup
+```bash
+sudo systemctl stop netmap
+sudo tar -xzvf /backup/netmap-backup-YYYY-MM-DD.tar.gz -C /opt/netmap/
+sudo chown -R root:root /opt/netmap/data /opt/netmap/netmap.cfg
+sudo systemctl start netmap
 ```
 
 ---
 
 ## 🗑️ Desinstalação
 
-Para remover o serviço do servidor:
+Para desinstalar o serviço e remover os arquivos do sistema:
 ```bash
 sudo /opt/netmap/uninstall.sh
 ```
-Ou manualmente:
+
+Ou manualmente via terminal:
 ```bash
 sudo systemctl stop netmap
 sudo systemctl disable netmap
 sudo rm -f /etc/systemd/system/netmap.service
 sudo systemctl daemon-reload
+sudo rm -rf /opt/netmap
 ```

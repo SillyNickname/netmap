@@ -24,8 +24,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 async def create_session(user_id: int) -> str:
     token = secrets.token_hex(32)
-    expires_at = int(time.time()) + SESSION_LIFETIME_SECONDS
+    now = int(time.time())
+    expires_at = now + SESSION_LIFETIME_SECONDS
     async with get_hosts_db() as db:
+        await db.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
         await db.execute(
             "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)",
             (token, user_id, expires_at)

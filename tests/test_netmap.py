@@ -74,6 +74,10 @@ def test_target_validation():
     assert is_valid_target("-c 1 127.0.0.1") is False
     assert is_valid_target("; rm -rf /") is False
     assert is_valid_target("") is False
+    assert is_valid_target("127.0.0.1\n") is False
+    assert is_valid_target("127.0.0.1 8.8.8.8") is False
+    assert is_valid_target("a" * 254) is False
+    assert is_valid_target(None) is False
 
 @pytest.mark.asyncio
 async def test_csv_import_and_hierarchy():

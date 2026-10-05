@@ -225,7 +225,7 @@ function renderHostsTable() {
             <td>${h.is_active ? `<span style="color: var(--up-color);">${t("active_status")}</span>` : `<span style="color: var(--down-color);">${t("disabled_status")}</span>`}</td>
             <td style="text-align: right;">
                 <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openEditHostModal(${h.id})">${t("btn_edit")}</button>
-                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteHost(${h.id}, '${escapeHtml(h.name)}')">${t("btn_delete")}</button>
+                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteHost(${h.id})">${t("btn_delete")}</button>
             </td>
         </tr>
     `).join("");
@@ -325,7 +325,9 @@ async function handleHostSubmit(e) {
     }
 }
 
-async function deleteHost(id, name) {
+async function deleteHost(id, optionalName) {
+    const host = currentHosts.find(h => h.id === id);
+    const name = optionalName || (host ? host.name : String(id));
     if (!confirm(`${t("confirm_delete_host")} '${name}'?`)) {
         return;
     }
@@ -444,7 +446,7 @@ function renderGroupsTable() {
 
     const sortedGroups = sortGroupsList(currentGroups, groupSortColumn, groupSortAsc);
 
-    tbody.innerHTML = sortedGroups.map(g => `
+    tbody.innerHTML = sortedGroups.map((g, idx) => `
         <tr>
             <td><strong>${escapeHtml(g.name)}</strong></td>
             <td>
@@ -455,11 +457,23 @@ function renderGroupsTable() {
             <td>${g.host_count} ${t("hosts_count_suffix")}</td>
             <td>${escapeHtml(g.description || '—')}</td>
             <td style="text-align: right;">
-                <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openEditGroupModal('${escapeHtml(g.name)}')">${t("btn_edit")}</button>
-                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteGroup('${escapeHtml(g.name)}')">${t("btn_delete")}</button>
+                <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openEditGroupModalByIndex(${idx})">${t("btn_edit")}</button>
+                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteGroupByIndex(${idx})">${t("btn_delete")}</button>
             </td>
         </tr>
     `).join("");
+}
+
+function openEditGroupModalByIndex(idx) {
+    const sortedGroups = sortGroupsList(currentGroups, groupSortColumn, groupSortAsc);
+    const grp = sortedGroups[idx];
+    if (grp) openEditGroupModal(grp.name);
+}
+
+function deleteGroupByIndex(idx) {
+    const sortedGroups = sortGroupsList(currentGroups, groupSortColumn, groupSortAsc);
+    const grp = sortedGroups[idx];
+    if (grp) deleteGroup(grp.name);
 }
 
 function openAddGroupModal() {
@@ -685,7 +699,7 @@ function renderUsersTable() {
             </td>
             <td>${new Date(u.created_at).toLocaleDateString()}</td>
             <td style="text-align: right;">
-                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteUser(${u.id}, '${escapeHtml(u.username)}')">${t("btn_delete")}</button>
+                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.75rem;" onclick="deleteUser(${u.id})">${t("btn_delete")}</button>
             </td>
         </tr>
     `).join("");
@@ -716,7 +730,9 @@ async function handleUserCreate(e) {
     }
 }
 
-async function deleteUser(id, username) {
+async function deleteUser(id, optionalUsername) {
+    const user = currentUsers.find(u => u.id === id);
+    const username = optionalUsername || (user ? user.username : String(id));
     if (!confirm(`${t("confirm_delete_user")} '${username}'?`)) return;
     try {
         const res = await fetch(`${APP_BASE}/api/admin/users/${id}`, { method: "DELETE" });

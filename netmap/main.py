@@ -52,7 +52,22 @@ class ReverseProxyPrefixMiddleware:
             elif not scope.get("root_path"):
                 scope["root_path"] = ""
 
-        await self.app(scope, receive, send)
+        if scope["type"] == "http":
+            async def send_with_security_headers(message):
+                if message["type"] == "http.response.start":
+                    headers = list(message.get("headers", []))
+                    existing = {h[0].lower() for h in headers}
+                    if b"x-content-type-options" not in existing:
+                        headers.append((b"x-content-type-options", b"nosniff"))
+                    if b"x-frame-options" not in existing:
+                        headers.append((b"x-frame-options", b"SAMEORIGIN"))
+                    if b"referrer-policy" not in existing:
+                        headers.append((b"referrer-policy", b"strict-origin-when-cross-origin"))
+                    message["headers"] = headers
+                await send(message)
+            await self.app(scope, receive, send_with_security_headers)
+        else:
+            await self.app(scope, receive, send)
 
 app = FastAPI(
     title="NetMap - Network Tree Status Monitor",
