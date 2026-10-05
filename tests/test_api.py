@@ -393,11 +393,13 @@ async def test_location_warning_levels_and_timeline_pagination():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
 
-        # Create hosts in Location-Yellow (2 hosts) and Location-Red (4 hosts)
+        # Create hosts in Location-Yellow (3 hosts) and Location-Red (4 hosts)
         y1_res = await client.post("/api/admin/hosts", json={"name": "Y1", "ip_address": "10.1.1.1", "location": "Loc-Yellow"})
         y2_res = await client.post("/api/admin/hosts", json={"name": "Y2", "ip_address": "10.1.1.2", "location": "Loc-Yellow"})
+        y3_res = await client.post("/api/admin/hosts", json={"name": "Y3", "ip_address": "10.1.1.3", "location": "Loc-Yellow"})
         y1_id = y1_res.json()["id"]
         y2_id = y2_res.json()["id"]
+        y3_id = y3_res.json()["id"]
 
         r1_res = await client.post("/api/admin/hosts", json={"name": "R1", "ip_address": "10.2.1.1", "location": "Loc-Red"})
         r2_res = await client.post("/api/admin/hosts", json={"name": "R2", "ip_address": "10.2.1.2", "location": "Loc-Red"})
@@ -410,11 +412,12 @@ async def test_location_warning_levels_and_timeline_pagination():
 
         now = int(time.time())
 
-        # Set status: Loc-Yellow 1/2 down (50%) -> alert_level == "yellow"
+        # Set status: Loc-Yellow 1/3 down (33.3%) -> alert_level == "yellow" (< 50%)
         ping_engine.latest_host_status[y1_id] = PingResult(host_id=y1_id, is_up=True, rtt_ms=10.0, timestamp=now)
-        ping_engine.latest_host_status[y2_id] = PingResult(host_id=y2_id, is_up=False, rtt_ms=None, error_msg="Timeout", timestamp=now)
+        ping_engine.latest_host_status[y2_id] = PingResult(host_id=y2_id, is_up=True, rtt_ms=12.0, timestamp=now)
+        ping_engine.latest_host_status[y3_id] = PingResult(host_id=y3_id, is_up=False, rtt_ms=None, error_msg="Timeout", timestamp=now)
 
-        # Set status: Loc-Red 3/4 down (75%) -> alert_level == "red"
+        # Set status: Loc-Red 3/4 down (75%) -> alert_level == "red" (>= 50%)
         ping_engine.latest_host_status[r1_id] = PingResult(host_id=r1_id, is_up=True, rtt_ms=15.0, timestamp=now)
         ping_engine.latest_host_status[r2_id] = PingResult(host_id=r2_id, is_up=False, rtt_ms=None, error_msg="Timeout", timestamp=now)
         ping_engine.latest_host_status[r3_id] = PingResult(host_id=r3_id, is_up=False, rtt_ms=None, error_msg="Timeout", timestamp=now)
@@ -427,14 +430,15 @@ async def test_location_warning_levels_and_timeline_pagination():
         loc_map = {l["name"]: l for l in tree_data["locations"]}
 
         assert loc_map["Loc-Yellow"]["alert_level"] == "yellow"
-        assert loc_map["Loc-Yellow"]["device_total"] == 2
+        assert loc_map["Loc-Yellow"]["device_total"] == 3
         assert loc_map["Loc-Yellow"]["device_down"] == 1
-        assert loc_map["Loc-Yellow"]["device_down_pct"] == 50.0
+        assert loc_map["Loc-Yellow"]["device_down_pct"] == 33.3
 
         assert loc_map["Loc-Red"]["alert_level"] == "red"
         assert loc_map["Loc-Red"]["device_total"] == 4
         assert loc_map["Loc-Red"]["device_down"] == 3
         assert loc_map["Loc-Red"]["device_down_pct"] == 75.0
+        assert tree_data["device_summary"]["alert_level"] == "red"
 
         # Insert historical polls into ping_history across multiple days
         past_72h = now - (72 * 3600)

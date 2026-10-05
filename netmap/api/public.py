@@ -258,13 +258,13 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
             dev_down_pct = round((dev_down / dev_total) * 100, 1) if dev_total > 0 else 0.0
 
             # Warning sign thresholds:
-            # Red: >= 75% down
-            # Yellow: >= 50% down (and < 75%)
+            # Red: >= 50% down
+            # Yellow: < 50% down (and > 0 devices down)
             alert_level = None
             if dev_total > 0 and dev_down > 0:
-                if dev_down_pct >= 75.0:
+                if dev_down_pct >= 50.0:
                     alert_level = "red"
-                elif dev_down_pct >= 50.0:
+                else:
                     alert_level = "yellow"
 
             locations_map[loc] = {
@@ -303,9 +303,9 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
     all_down_pct = round((all_dev_down / all_dev_total) * 100, 1) if all_dev_total > 0 else 0.0
     all_alert_level = None
     if all_dev_total > 0 and all_dev_down > 0:
-        if all_down_pct >= 75.0:
+        if all_down_pct >= 50.0 or any(l.get("alert_level") == "red" for l in locations_map.values()):
             all_alert_level = "red"
-        elif all_down_pct >= 50.0:
+        else:
             all_alert_level = "yellow"
 
     locations_list = list(locations_map.values())

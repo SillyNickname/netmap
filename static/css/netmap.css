@@ -747,25 +747,49 @@ body {
   font-family: var(--font-mono);
 }
 
-/* Location bar warning badges */
+/* Location bar warning badges & offline dot mark */
 .loc-warning-badge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 3px;
   margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
   vertical-align: middle;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .loc-warning-badge.badge-red {
-  color: #ef4444;
-  filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.8));
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
   animation: pulse-red-badge 2s infinite ease-in-out;
 }
 
 .loc-warning-badge.badge-yellow {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+}
+
+.loc-warning-badge .loc-dot {
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.loc-warning-badge.badge-red .loc-dot {
+  color: #ef4444;
+  text-shadow: 0 0 4px #ef4444;
+}
+
+.loc-warning-badge.badge-yellow .loc-dot {
   color: #f59e0b;
-  filter: drop-shadow(0 0 3px rgba(245, 158, 11, 0.8));
+  text-shadow: 0 0 4px #f59e0b;
 }
 
 @keyframes pulse-red-badge {
@@ -774,13 +798,13 @@ body {
 }
 
 .pill-tab.alert-red {
-  border-color: rgba(239, 68, 68, 0.6) !important;
-  background: rgba(239, 68, 68, 0.08) !important;
+  border-color: rgba(239, 68, 68, 0.7) !important;
+  background: rgba(239, 68, 68, 0.12) !important;
 }
 
 .pill-tab.alert-yellow {
-  border-color: rgba(245, 158, 11, 0.6) !important;
-  background: rgba(245, 158, 11, 0.08) !important;
+  border-color: rgba(245, 158, 11, 0.7) !important;
+  background: rgba(245, 158, 11, 0.12) !important;
 }
 
 /* History Time Navigation Toolbar */
