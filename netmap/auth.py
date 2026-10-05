@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (Authentication & Sessions)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import time
 import secrets
 from typing import Optional, Dict, Any

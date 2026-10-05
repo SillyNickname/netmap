@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (Poll API Endpoints)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 from fastapi import APIRouter, Depends
 from netmap.auth import require_authenticated
 from netmap.ping_engine import ping_engine

@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (Public API Endpoints)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import time
 import asyncio
 from typing import Dict, List, Any, Optional

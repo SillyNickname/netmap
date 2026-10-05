@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (Database Management)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import os
 import aiosqlite
 from contextlib import asynccontextmanager

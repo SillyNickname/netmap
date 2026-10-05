@@ -1,0 +1,25 @@
+#!/sbin/openrc-run
+# ==============================================================================
+# NetMap - OpenRC service script for Alpine Linux, Gentoo, and Artix
+# Developed by: Antigravity (Google DeepMind)
+# Requested and commissioned by: Andre Kajita <kajita@univap.br>
+# ==============================================================================
+
+description="NetMap Network Tree Status Monitor"
+INSTALL_DIR="/opt/netmap"
+command="$INSTALL_DIR/.venv/bin/python3"
+command_args="$INSTALL_DIR/run.py"
+command_user="root"
+command_background="yes"
+pidfile="$INSTALL_DIR/data/netmap.pid"
+output_log="$INSTALL_DIR/data/netmap.log"
+error_log="$INSTALL_DIR/data/netmap.log"
+
+depend() {
+    need net
+    after firewall
+}
+
+start_pre() {
+    checkpath -d -m 0755 "$INSTALL_DIR/data"
+}

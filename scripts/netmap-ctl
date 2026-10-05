@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# NetMap - Unified Server Control Script (start, stop, restart, status, logs)
+# Developed by: Antigravity (Google DeepMind)
+# Requested and commissioned by: Andre Kajita <kajita@univap.br>
+# ==============================================================================
+# Supports modern Linux distributions with systemd (Ubuntu, Debian, RHEL,
+# CentOS, Rocky Linux, AlmaLinux, Fedora, Arch, openSUSE) as well as direct
+# process daemon management for non-systemd environments.
+# ==============================================================================
+
+set -e
+
+# ANSI Color Codes
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Resolve installation directory (following symlinks)
+TARGET_FILE="${BASH_SOURCE[0]}"
+while [ -L "$TARGET_FILE" ]; do
+    TARGET_DIR="$(cd "$(dirname "$TARGET_FILE")" && pwd)"
+    TARGET_FILE="$(readlink "$TARGET_FILE")"
+    [[ $TARGET_FILE != /* ]] && TARGET_FILE="$TARGET_DIR/$TARGET_FILE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$TARGET_FILE")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/../run.py" ]; then
+    INSTALL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+elif [ -f "/opt/netmap/run.py" ]; then
+    INSTALL_DIR="/opt/netmap"
+else
+    INSTALL_DIR="$(pwd)"
+fi
+
+CFG_FILE="$INSTALL_DIR/netmap.cfg"
+VENV_PY="$INSTALL_DIR/.venv/bin/python3"
+RUN_PY="$INSTALL_DIR/run.py"
+PID_FILE="$INSTALL_DIR/data/netmap.pid"
+LOG_FILE="$INSTALL_DIR/data/netmap.log"
+
+# Fallback to system python if venv python not found
+if [ ! -f "$VENV_PY" ]; then
+    VENV_PY="$(command -v python3 || echo 'python3')"
+fi
+
+# Helper to read values from netmap.cfg
+get_cfg_val() {
+    local section="$1"
+    local key="$2"
+    local default="$3"
+    if [ -f "$CFG_FILE" ] && command -v python3 >/dev/null 2>&1; then
+        python3 -c "
+import configparser
+cfg = configparser.ConfigParser()
+cfg.read('$CFG_FILE')
+try:
+    val = cfg.get('$section', '$key')
+    print(val.strip() if val is not None else '$default')
+except Exception:
+    print('$default')
+" 2>/dev/null || echo "$default"
+    else
+        echo "$default"
+    fi
+}
+
+SERVER_HOST=$(get_cfg_val "server" "host" "0.0.0.0")
+SERVER_PORT=$(get_cfg_val "server" "port" "8080")
+URL_PREFIX=$(get_cfg_val "server" "url_prefix" "")
+
+# Determine if systemd is active on this system
+has_systemd() {
+    if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+        if systemctl list-unit-files netmap.service 2>/dev/null | grep -q "netmap.service"; then
+            return 0
+        fi
+        if [ -f /etc/systemd/system/netmap.service ]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# ----------------- Commands -----------------
+
+cmd_start() {
+    if has_systemd; then
+        echo -e "${BLUE}[INFO] Starting NetMap via systemd (netmap.service)...${NC}"
+        systemctl start netmap.service
+        sleep 1
+        cmd_status
+    else
+        echo -e "${BLUE}[INFO] Starting NetMap background daemon...${NC}"
+        if [ -f "$PID_FILE" ]; then
+            local pid
+            pid=$(cat "$PID_FILE" 2>/dev/null || true)
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                echo -e "${YELLOW}[WARN] NetMap is already running (PID: $pid).${NC}"
+                return 0
+            fi
+            rm -f "$PID_FILE"
+        fi
+
+        mkdir -p "$INSTALL_DIR/data"
+        cd "$INSTALL_DIR"
+        nohup "$VENV_PY" "$RUN_PY" >> "$LOG_FILE" 2>&1 &
+        local new_pid=$!
+        echo "$new_pid" > "$PID_FILE"
+
+        sleep 1
+        if kill -0 "$new_pid" 2>/dev/null; then
+            echo -e "${GREEN}[✓] NetMap started successfully (PID: $new_pid).${NC}"
+            echo -e "Listening on: ${CYAN}http://${SERVER_HOST}:${SERVER_PORT}${URL_PREFIX}/${NC}"
+        else
+            echo -e "${RED}[ERROR] NetMap failed to start. Check logs at: $LOG_FILE${NC}"
+            rm -f "$PID_FILE"
+            return 1
+        fi
+    fi
+}
+
+cmd_stop() {
+    if has_systemd; then
+        echo -e "${YELLOW}[INFO] Stopping NetMap via systemd (netmap.service)...${NC}"
+        systemctl stop netmap.service
+        echo -e "${GREEN}[✓] NetMap stopped.${NC}"
+    else
+        echo -e "${YELLOW}[INFO] Stopping NetMap background daemon...${NC}"
+        if [ ! -f "$PID_FILE" ]; then
+            # Search for running process
+            local pids
+            pids=$(pgrep -f "run.py" || true)
+            if [ -n "$pids" ]; then
+                echo -e "${YELLOW}[INFO] Terminating processes: $pids${NC}"
+                kill -15 $pids 2>/dev/null || true
+                sleep 1
+            else
+                echo -e "${YELLOW}[INFO] NetMap is not running.${NC}"
+            fi
+            return 0
+        fi
+
+        local pid
+        pid=$(cat "$PID_FILE" 2>/dev/null || true)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill -15 "$pid" 2>/dev/null || true
+            for _ in $(seq 1 10); do
+                if ! kill -0 "$pid" 2>/dev/null; then
+                    break
+                fi
+                sleep 0.5
+            done
+            if kill -0 "$pid" 2>/dev/null; then
+                echo -e "${RED}[WARN] Force killing unresponsive process ($pid)...${NC}"
+                kill -9 "$pid" 2>/dev/null || true
+            fi
+            echo -e "${GREEN}[✓] NetMap process ($pid) terminated.${NC}"
+        else
+            echo -e "${YELLOW}[INFO] NetMap process ($pid) not found.${NC}"
+        fi
+        rm -f "$PID_FILE"
+    fi
+}
+
+cmd_restart() {
+    echo -e "${BLUE}[INFO] Restarting NetMap service...${NC}"
+    if has_systemd; then
+        systemctl restart netmap.service
+        sleep 1
+        cmd_status
+    else
+        cmd_stop
+        sleep 1
+        cmd_start
+    fi
+}
+
+cmd_status() {
+    if has_systemd; then
+        echo -e "${BLUE}=== NetMap Service Status (systemd) ===${NC}"
+        systemctl status netmap.service --no-pager || true
+    else
+        echo -e "${BLUE}=== NetMap Process Status ===${NC}"
+        if [ -f "$PID_FILE" ]; then
+            local pid
+            pid=$(cat "$PID_FILE" 2>/dev/null || true)
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                echo -e "Status:        ${GREEN}RUNNING (PID: $pid)${NC}"
+                echo -e "Listening:     ${CYAN}http://${SERVER_HOST}:${SERVER_PORT}${URL_PREFIX}/${NC}"
+                echo -e "Log file:      $LOG_FILE"
+            else
+                echo -e "Status:        ${RED}STOPPED (stale PID file removed)${NC}"
+                rm -f "$PID_FILE"
+            fi
+        else
+            local pids
+            pids=$(pgrep -f "run.py" || true)
+            if [ -n "$pids" ]; then
+                echo -e "Status:        ${GREEN}RUNNING (PID: $pids)${NC}"
+                echo -e "Listening:     ${CYAN}http://${SERVER_HOST}:${SERVER_PORT}${URL_PREFIX}/${NC}"
+            else
+                echo -e "Status:        ${RED}STOPPED${NC}"
+            fi
+        fi
+    fi
+
+    # Query local API if reachable
+    local check_host="127.0.0.1"
+    if [ "$SERVER_HOST" != "0.0.0.0" ] && [ -n "$SERVER_HOST" ]; then
+        check_host="$SERVER_HOST"
+    fi
+    local api_url="http://${check_host}:${SERVER_PORT}${URL_PREFIX}/api/status"
+    if command -v curl >/dev/null 2>&1; then
+        local api_res
+        api_res=$(curl -s --max-time 2 "$api_url" 2>/dev/null || true)
+        if [ -n "$api_res" ] && echo "$api_res" | grep -q "total_hosts"; then
+            echo -e "Health Check:  ${GREEN}✓ API Responding${NC} ($api_url)"
+        fi
+    fi
+}
+
+cmd_logs() {
+    if has_systemd; then
+        echo -e "${BLUE}[INFO] Tailing netmap logs via journalctl (Ctrl+C to exit)...${NC}"
+        journalctl -u netmap.service -f
+    elif [ -f "$LOG_FILE" ]; then
+        echo -e "${BLUE}[INFO] Tailing log file: $LOG_FILE (Ctrl+C to exit)...${NC}"
+        tail -f "$LOG_FILE"
+    else
+        echo -e "${YELLOW}[WARN] No log file found at $LOG_FILE and systemd is not active.${NC}"
+    fi
+}
+
+cmd_nginx() {
+    local target_host="$SERVER_HOST"
+    if [ "$target_host" = "0.0.0.0" ]; then
+        target_host="127.0.0.1"
+    fi
+    local prefix="${URL_PREFIX:-/netmap}"
+    [[ "$prefix" != /* ]] && prefix="/$prefix"
+    prefix="${prefix%/}"
+
+    echo -e "${CYAN}# ====================================================================${NC}"
+    echo -e "${CYAN}# Nginx Reverse Proxy Configuration for NetMap${NC}"
+    echo -e "${CYAN}# Add this inside your server { ... } block in /etc/nginx/sites-available/${NC}"
+    echo -e "${CYAN}# ====================================================================${NC}"
+    echo ""
+    cat <<EOF
+# Redirect ${prefix} without trailing slash to ${prefix}/
+location = ${prefix} {
+    return 301 ${prefix}/;
+}
+
+# Proxy pass to NetMap backend
+location ${prefix}/ {
+    # Forward to NetMap backend (trailing slash rewrites URI to backend root)
+    proxy_pass http://${target_host}:${SERVER_PORT}/;
+
+    # Standard reverse proxy headers
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+
+    # Informs NetMap of its subpath prefix for URLs, assets, and cookies
+    proxy_set_header X-Forwarded-Prefix ${prefix};
+
+    # WebSocket and HTTP/1.1 support
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    # Recommended timeouts
+    proxy_connect_timeout 60s;
+    proxy_read_timeout 120s;
+}
+EOF
+    echo ""
+    echo -e "${CYAN}# Test and reload Nginx:${NC}"
+    echo -e "${YELLOW}sudo nginx -t && sudo systemctl reload nginx${NC}"
+}
+
+usage() {
+    echo -e "${BLUE}NetMap Service Control Script${NC}"
+    echo "Usage: $0 {start|stop|restart|status|logs|nginx|help}"
+    echo ""
+    echo "Commands:"
+    echo "  start     Start the NetMap service / background daemon"
+    echo "  stop      Stop the NetMap service"
+    echo "  restart   Restart the NetMap service"
+    echo "  status    Show service status and API health"
+    echo "  logs      Follow real-time service logs"
+    echo "  nginx     Display tailored Nginx reverse proxy configuration"
+    echo "  help      Show this help message"
+    echo ""
+    echo "Configuration ($CFG_FILE):"
+    echo "  IP Binding: $SERVER_HOST"
+    echo "  Port:       $SERVER_PORT"
+    echo "  URL Prefix: ${URL_PREFIX:-(none - root)}"
+    exit 1
+}
+
+# Entrypoint
+case "$1" in
+    start)
+        cmd_start
+        ;;
+    stop)
+        cmd_stop
+        ;;
+    restart)
+        cmd_restart
+        ;;
+    status)
+        cmd_status
+        ;;
+    logs)
+        cmd_logs
+        ;;
+    nginx)
+        cmd_nginx
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    *)
+        usage
+        ;;
+esac

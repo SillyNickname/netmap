@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (CSV Import & Export)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import csv
 import io
 from typing import List, Dict, Any

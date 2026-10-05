@@ -1,0 +1,125 @@
+#!/bin/sh
+# ==============================================================================
+# NetMap - SysVinit / LSB Service Script
+# Developed by: Antigravity (Google DeepMind)
+# Requested and commissioned by: Andre Kajita <kajita@univap.br>
+# ==============================================================================
+### BEGIN INIT INFO
+# Provides:          netmap
+# Required-Start:    $network $local_fs $remote_fs $syslog
+# Required-Stop:     $network $local_fs $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: NetMap Network Tree Status Monitor
+# Description:       High performance network topology status monitor daemon
+### END INIT INFO
+
+INSTALL_DIR="/opt/netmap"
+PIDFILE="$INSTALL_DIR/data/netmap.pid"
+LOGFILE="$INSTALL_DIR/data/netmap.log"
+PYTHON="$INSTALL_DIR/.venv/bin/python3"
+RUN_PY="$INSTALL_DIR/run.py"
+
+[ -f /etc/default/netmap ] && . /etc/default/netmap
+
+if [ ! -x "$PYTHON" ]; then
+    PYTHON="$(which python3 2>/dev/null || echo 'python3')"
+fi
+
+start() {
+    echo -n "Starting NetMap: "
+    if [ -f "$PIDFILE" ]; then
+        PID=$(cat "$PIDFILE" 2>/dev/null)
+        if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+            echo "Already running (PID $PID)."
+            return 0
+        fi
+        rm -f "$PIDFILE"
+    fi
+
+    mkdir -p "$INSTALL_DIR/data"
+    cd "$INSTALL_DIR" || return 1
+    nohup "$PYTHON" "$RUN_PY" >> "$LOGFILE" 2>&1 &
+    NEW_PID=$!
+    echo "$NEW_PID" > "$PIDFILE"
+    sleep 1
+    if kill -0 "$NEW_PID" 2>/dev/null; then
+        echo "OK (PID $NEW_PID)."
+    else
+        echo "FAILED. Check logs in $LOGFILE."
+        rm -f "$PIDFILE"
+        return 1
+    fi
+}
+
+stop() {
+    echo -n "Stopping NetMap: "
+    if [ ! -f "$PIDFILE" ]; then
+        PIDS=$(pgrep -f "run.py" 2>/dev/null)
+        if [ -n "$PIDS" ]; then
+            kill -15 $PIDS 2>/dev/null
+            echo "OK (PIDs $PIDS terminated)."
+        else
+            echo "Not running."
+        fi
+        return 0
+    fi
+
+    PID=$(cat "$PIDFILE" 2>/dev/null)
+    if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+        kill -15 "$PID" 2>/dev/null
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+            if ! kill -0 "$PID" 2>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
+        if kill -0 "$PID" 2>/dev/null; then
+            kill -9 "$PID" 2>/dev/null
+        fi
+        echo "OK."
+    else
+        echo "Not running."
+    fi
+    rm -f "$PIDFILE"
+}
+
+status() {
+    if [ -f "$PIDFILE" ]; then
+        PID=$(cat "$PIDFILE" 2>/dev/null)
+        if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+            echo "NetMap is running (PID $PID)."
+            return 0
+        fi
+    fi
+    PIDS=$(pgrep -f "run.py" 2>/dev/null)
+    if [ -n "$PIDS" ]; then
+        echo "NetMap is running (PID $PIDS)."
+        return 0
+    fi
+    echo "NetMap is stopped."
+    return 3
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart|force-reload)
+        stop
+        sleep 1
+        start
+        ;;
+    status)
+        status
+        ;;
+    *)
+        echo "Usage: /etc/init.d/netmap {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit 0

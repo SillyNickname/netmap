@@ -1,5 +1,8 @@
 # NetMap - Network Tree Status Monitor
 
+> **Developed by:** Antigravity (Google DeepMind)  
+> **Requested and commissioned by:** Andre Kajita (<kajita@univap.br>)
+
 NetMap is a high-performance, resource-efficient network status monitoring system built with Python and FastAPI. It periodically polls network targets with parallel ICMP pings (user-configurable concurrency) and displays their real-time and historical health in an at-a-glance, widescreen-optimized (720p/1080p) **left-to-right tree hierarchy**.
 
 ---
@@ -81,17 +84,77 @@ uvicorn netmap.main:app --host 0.0.0.0 --port 8080
 
 ---
 
-## 📦 Ubuntu Server Deployment (Production)
+## 📦 Linux & Ubuntu Server Deployment (Production, No Docker)
 
-For automated deployment on **Ubuntu Server** without Docker, run the zero-configuration installer:
+NetMap runs natively without Docker on Ubuntu Server and all major Linux distributions.
+
+### 1. Automated Installation
+Run the installer interactively (or with flags):
 
 ```bash
+# Interactive mode (prompts for IP binding, port, and URL subpath):
 sudo ./install.sh
+
+# Non-interactive mode with custom port, host, and URL prefix:
+sudo ./install.sh --host 0.0.0.0 --port 8080 --prefix /netmap -y
 ```
 
-This automated script uses Ubuntu's native `apt` package manager to install system dependencies (`python3`, `python3-pip`, `python3-venv`, `iputils-ping`), builds an isolated virtual environment with `pip`, and registers a background daemon service (`netmap.service`) via `systemd` with automatic restart on boot.
+| Option | Description | Default |
+|---|---|---|
+| `--host <IP>` | Server bind address (`0.0.0.0` for all, `127.0.0.1` for local proxy) | `0.0.0.0` |
+| `--port <PORT>` | TCP port number | `8080` |
+| `--prefix <PATH>` | URL subpath for reverse proxy (e.g. `/netmap`) | `/netmap` |
+| `--dir <PATH>` | Installation target directory | `/opt/netmap` |
+| `--in-place` | Install in current working directory | Disabled |
+| `-y, --yes` | Non-interactive mode (use defaults or flags) | Disabled |
 
-For detailed manual instructions, Nginx reverse proxy configurations (both domain root and `/netmap/` subpath), and firewall rules, see [DEPLOYMENT.md](file:///Extra/git/netmap/DEPLOYMENT.md).
+### 2. Service Management CLI
+NetMap installs a global CLI tool (`netmap`) for controlling the service on Ubuntu and Linux:
+
+```bash
+sudo netmap start     # Start NetMap service
+sudo netmap stop      # Stop NetMap service
+sudo netmap restart   # Restart NetMap service
+sudo netmap status    # Check service and API health
+sudo netmap logs      # Follow real-time logs
+netmap nginx          # Print tailored Nginx reverse proxy configuration
+```
+
+Or using native systemd commands:
+```bash
+sudo systemctl restart netmap
+sudo systemctl status netmap
+sudo journalctl -u netmap -f
+```
+
+### 3. Nginx Reverse Proxy Configuration
+To serve NetMap under a generic domain with a specific subpath (e.g., `https://<your-domain>/netmap`), add this block to your Nginx `server { ... }` configuration:
+
+```nginx
+# Redirect /netmap without trailing slash
+location = /netmap {
+    return 301 /netmap/;
+}
+
+# Proxy pass to NetMap backend
+location /netmap/ {
+    proxy_pass http://127.0.0.1:8080/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix /netmap;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_connect_timeout 60s;
+    proxy_read_timeout 120s;
+}
+```
+
+Reload Nginx: `sudo nginx -t && sudo systemctl reload nginx`.
+
+For complete manual setup, non-systemd init scripts, and troubleshooting, see [DEPLOYMENT.md](file:///Extra/git/netmap/DEPLOYMENT.md).
 
 ---
 
@@ -167,3 +230,12 @@ Run the test suite with pytest:
 source .venv/bin/activate
 PYTHONPATH=. pytest -v
 ```
+
+---
+
+## 👥 Authorship & Credits
+
+- **Developer**: Antigravity (Google DeepMind)
+- **Requested & Commissioned by**: Andre Kajita (<kajita@univap.br>)
+- **Institution**: Universidade do Vale do Paraíba (UNIVAP)
+

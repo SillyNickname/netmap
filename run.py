@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# ==============================================================================
+# NetMap - Network Tree Status Monitor
+# Developed by: Antigravity (Google DeepMind)
+# Requested and commissioned by: Andre Kajita <kajita@univap.br>
+# ==============================================================================
 import os
 import sys
 

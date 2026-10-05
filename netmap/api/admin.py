@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (Admin API Endpoints)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import os
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response

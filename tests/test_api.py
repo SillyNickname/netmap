@@ -1,3 +1,9 @@
+"""
+NetMap - API Test Suite
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport

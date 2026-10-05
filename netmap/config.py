@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (Configuration Manager)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import os
 import configparser
 from pathlib import Path

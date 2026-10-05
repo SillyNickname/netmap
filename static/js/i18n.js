@@ -1,5 +1,9 @@
-// NetMap Internationalization (i18n) Module
-// Default language: pt-BR (Brazilian Portuguese)
+/**
+ * NetMap - Network Tree Status Monitor (i18n Module)
+ * Developed by: Antigravity (Google DeepMind)
+ * Requested and commissioned by: Andre Kajita <kajita@univap.br>
+ * Default language: pt-BR (Brazilian Portuguese)
+ */
 
 const TRANSLATIONS = {
     "pt-BR": {

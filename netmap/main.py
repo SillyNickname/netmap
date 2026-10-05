@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request

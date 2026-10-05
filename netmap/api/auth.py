@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (Auth API Endpoints)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 from fastapi import APIRouter, HTTPException, Response, Request, status
 from netmap.db import get_hosts_db
 from netmap.auth import verify_password, create_session, delete_session, get_current_user_optional, SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS

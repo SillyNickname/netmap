@@ -1,3 +1,9 @@
+"""
+NetMap - Network Tree Status Monitor (Data Models & Schemas)
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 from typing import Optional
 from pydantic import BaseModel, Field
 

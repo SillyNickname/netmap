@@ -1,4 +1,8 @@
-// NetMap Administrative Interface JS
+/**
+ * NetMap - Network Tree Status Monitor (Admin Interface JS)
+ * Developed by: Antigravity (Google DeepMind)
+ * Requested and commissioned by: Andre Kajita <kajita@univap.br>
+ */
 const APP_BASE = (function() {
     if (typeof window.NETMAP_BASE === "string" && window.NETMAP_BASE.length > 0) {
         return window.NETMAP_BASE.replace(/\/$/, "");

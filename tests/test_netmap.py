@@ -1,3 +1,9 @@
+"""
+NetMap - Core Test Suite
+Developed by: Antigravity (Google DeepMind)
+Requested and commissioned by: Andre Kajita <kajita@univap.br>
+"""
+
 import asyncio
 import os
 import pytest
