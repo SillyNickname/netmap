@@ -314,13 +314,24 @@ function renderLocationFilters() {
             `;
         }
 
+        let allUnstableBadge = "";
+        if (devSummary && devSummary.unstable_count > 0) {
+            const uTitle = t("loc_unstable_title").replace("{count}", devSummary.unstable_count);
+            const uLvl = devSummary.unstable_max_level || "lime";
+            allUnstableBadge = `
+                <span class="loc-unstable-badge badge-unstable-${uLvl}" title="${escapeHtml(uTitle)}">
+                    <span class="unstable-icon">⚡</span> ${devSummary.unstable_count}
+                </span>
+            `;
+        }
+
         const allHref = `${APP_BASE}/`;
         const totalAllCount = locs.reduce((acc, l) => acc + (l.device_total !== undefined ? l.device_total : l.total_count), 0);
         let html = `
             <a href="${allHref}" class="pill-tab ${activeLocationFilter === 'all' ? 'active' : ''} ${allAlertClass}" 
                data-location="all"
                onclick="event.preventDefault(); filterLocation('all');">
-                ${t("all_sites")} (${totalAllCount})${allAlertBadge}
+                ${t("all_sites")} (${totalAllCount})${allAlertBadge}${allUnstableBadge}
             </a>
         `;
         locs.forEach(l => {
@@ -352,11 +363,22 @@ function renderLocationFilters() {
                 `;
             }
 
+            let locUnstableBadge = "";
+            if (l.unstable_count > 0) {
+                const uTitle = t("loc_unstable_title").replace("{count}", l.unstable_count);
+                const uLvl = l.unstable_max_level || "lime";
+                locUnstableBadge = `
+                    <span class="loc-unstable-badge badge-unstable-${uLvl}" title="${escapeHtml(uTitle)}">
+                        <span class="unstable-icon">⚡</span> ${l.unstable_count}
+                    </span>
+                `;
+            }
+
             html += `
                 <a href="${locHref}" class="pill-tab ${isActive ? 'active' : ''} ${locAlertClass}" 
                    data-location="${escapeHtml(l.name)}"
                    onclick="event.preventDefault(); filterLocation(this.getAttribute('data-location'));">
-                    ${escapeHtml(l.name)} (${devTotal})${locAlertBadge}
+                    ${escapeHtml(l.name)} (${devTotal})${locAlertBadge}${locUnstableBadge}
                 </a>
             `;
         });
@@ -523,6 +545,17 @@ function renderTree() {
             `;
         }
 
+        let unstableBadge = "";
+        if (loc.unstable_count > 0) {
+            const uTitle = t("loc_unstable_title").replace("{count}", loc.unstable_count);
+            const uLvl = loc.unstable_max_level || "lime";
+            unstableBadge = `
+                <span class="loc-unstable-badge badge-unstable-${uLvl}" title="${escapeHtml(uTitle)}">
+                    <span class="unstable-icon">⚡</span> ${loc.unstable_count}
+                </span>
+            `;
+        }
+
         let rootsHtml = "";
         if (loc.roots.length === 0) {
             rootsHtml = `<div style="color: var(--text-dim); font-size: 0.85rem; padding: 12px;">${t("no_roots")}</div>`;
@@ -548,6 +581,7 @@ function renderTree() {
                         <span class="location-name-text">${escapeHtml(loc.name)}</span>
                         <span class="location-badge">${devTotal} ${t("hosts_count_suffix")}</span>
                         ${alertBadge}
+                        ${unstableBadge}
                     </div>
                     <div class="location-stats">
                         <span style="color: var(--up-color);">● ${devUp} ${t("status_up")}</span>
@@ -592,19 +626,33 @@ function renderHostCard(node) {
     let statusText = t("status_unknown");
     let statusBadgeClass = "unpolled";
 
+    // Instability check (> 10% downtime in past 6 hours)
+    const instLevel = node.instability_level; // "lime", "yellow", "red" or null
+    let instClass = "";
+    let instText = "";
+    if (instLevel) {
+        instClass = `instability-${instLevel}`;
+        const key = `instability_desc_${instLevel}`;
+        instText = t(key).replace("{pct}", node.downtime_6h_pct || 0);
+    }
+
     // Degradado / Parcialmente Ativo: use a yellow box
     if (node.is_degraded) {
-        statusClass = "status-degraded";
+        statusClass = `status-degraded ${instClass}`.trim();
         statusText = t("status_partially_up");
-        statusBadgeClass = "degraded";
+        statusBadgeClass = `degraded ${instClass}`.trim();
     } else if (node.is_up === true) {
-        statusClass = "status-up";
+        statusClass = `status-up ${instClass}`.trim();
         statusText = t("status_up");
-        statusBadgeClass = "up";
+        statusBadgeClass = `up ${instClass}`.trim();
     } else if (node.is_up === false) {
-        statusClass = "status-down";
+        statusClass = `status-down ${instClass}`.trim();
         statusText = t("status_down");
         statusBadgeClass = "down";
+    }
+
+    if (instText) {
+        statusText += ` (${instText})`;
     }
 
     // Ping time / RTT:

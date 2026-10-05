@@ -474,6 +474,55 @@ body {
   background-color: var(--unpolled-color);
 }
 
+/* Instability variants (downtime in past 6 hours) */
+/* 1. Greenish-yellow (lime) for > 10% and <= 30% downtime */
+.host-card.instability-lime {
+  background-color: rgba(132, 204, 22, 0.16) !important;
+  border-color: rgba(132, 204, 22, 0.5) !important;
+  border-left: 4px solid #84cc16 !important;
+}
+.host-card.instability-lime:hover {
+  background-color: rgba(132, 204, 22, 0.28) !important;
+  border-color: #84cc16 !important;
+  box-shadow: 0 2px 10px rgba(132, 204, 22, 0.35) !important;
+}
+.status-dot.instability-lime {
+  background-color: #84cc16 !important;
+  box-shadow: 0 0 5px #84cc16 !important;
+}
+
+/* 2. Yellow for > 30% and <= 50% downtime */
+.host-card.instability-yellow {
+  background-color: rgba(234, 179, 8, 0.18) !important;
+  border-color: rgba(234, 179, 8, 0.6) !important;
+  border-left: 4px solid #eab308 !important;
+}
+.host-card.instability-yellow:hover {
+  background-color: rgba(234, 179, 8, 0.3) !important;
+  border-color: #eab308 !important;
+  box-shadow: 0 2px 10px rgba(234, 179, 8, 0.38) !important;
+}
+.status-dot.instability-yellow {
+  background-color: #eab308 !important;
+  box-shadow: 0 0 6px #eab308 !important;
+}
+
+/* 3. Red for > 50% downtime */
+.host-card.instability-red {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  border-left: 4px solid #ef4444 !important;
+}
+.host-card.instability-red:hover {
+  background-color: rgba(239, 68, 68, 0.32) !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.42) !important;
+}
+.status-dot.instability-red {
+  background-color: #ef4444 !important;
+  box-shadow: 0 0 6px #ef4444 !important;
+}
+
 .host-name {
   font-weight: 600;
   font-size: 11px;
@@ -805,6 +854,47 @@ body {
 .pill-tab.alert-yellow {
   border-color: rgba(245, 158, 11, 0.7) !important;
   background: rgba(245, 158, 11, 0.12) !important;
+}
+
+/* Location bar instability warning badge */
+.loc-unstable-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  vertical-align: middle;
+  line-height: 1.2;
+}
+
+.loc-unstable-badge.badge-unstable-lime {
+  color: #bef264;
+  background: rgba(132, 204, 22, 0.2);
+  border: 1px solid rgba(132, 204, 22, 0.6);
+  box-shadow: 0 0 5px rgba(132, 204, 22, 0.25);
+}
+
+.loc-unstable-badge.badge-unstable-yellow {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 5px rgba(245, 158, 11, 0.3);
+}
+
+.loc-unstable-badge.badge-unstable-red {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);
+}
+
+.loc-unstable-badge .unstable-icon {
+  font-size: 0.72rem;
+  line-height: 1;
 }
 
 /* History Time Navigation Toolbar */

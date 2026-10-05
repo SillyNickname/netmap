@@ -254,6 +254,40 @@ class PingEngine:
                         })
         return result_map
 
+    async def get_6h_downtime_stats(self, host_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        if not host_ids:
+            return {}
+        
+        six_hours_ago = int(time.time()) - (6 * 3600)
+        placeholders = ",".join("?" for _ in host_ids)
+        query = f"""
+            SELECT host_id,
+                   COUNT(*) as total_polls,
+                   SUM(CASE WHEN is_up = 0 THEN 1 ELSE 0 END) as down_polls
+            FROM ping_history
+            WHERE host_id IN ({placeholders}) AND timestamp >= ?
+            GROUP BY host_id
+        """
+        params = list(host_ids) + [six_hours_ago]
+        
+        result_map: Dict[int, Dict[str, Any]] = {
+            hid: {"total_polls": 0, "down_polls": 0, "downtime_pct": 0.0}
+            for hid in host_ids
+        }
+        async with get_history_db() as db:
+            async with db.execute(query, params) as cursor:
+                for row in await cursor.fetchall():
+                    hid = row["host_id"]
+                    tot = row["total_polls"] or 0
+                    down = row["down_polls"] or 0
+                    pct = round((down / tot) * 100, 1) if tot > 0 else 0.0
+                    result_map[hid] = {
+                        "total_polls": tot,
+                        "down_polls": down,
+                        "downtime_pct": pct
+                    }
+        return result_map
+
     async def get_host_history_timeline(self, host_id: int, hours: Optional[int] = None, end_time: Optional[int] = None) -> Dict[str, Any]:
         # Default and maximum window is 48 hours
         if hours is None:

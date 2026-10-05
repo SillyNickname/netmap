@@ -92,6 +92,10 @@ const TRANSLATIONS = {
         "avg_latency": "Latência média:",
         "loc_warning_red_title": "Alerta Crítico: {down}/{total} dispositivos offline ({pct}%)",
         "loc_warning_yellow_title": "Alerta de Atenção: {down}/{total} dispositivos offline ({pct}%)",
+        "loc_unstable_title": "Alerta de Instabilidade: {count} dispositivo(s) com >10% de queda nas últimas 6h",
+        "instability_desc_lime": "Instável: {pct}% de queda nas últimas 6h",
+        "instability_desc_yellow": "Alta Instabilidade: {pct}% de queda nas últimas 6h",
+        "instability_desc_red": "Instabilidade Crítica: {pct}% de queda nas últimas 6h",
 
         // Login Modal
         "login_modal_title": "Acessar o NetMap",
@@ -315,6 +319,10 @@ const TRANSLATIONS = {
         "avg_latency": "Avg latency:",
         "loc_warning_red_title": "Critical Alert: {down}/{total} devices offline ({pct}%)",
         "loc_warning_yellow_title": "Warning Alert: {down}/{total} devices offline ({pct}%)",
+        "loc_unstable_title": "Instability Alert: {count} device(s) with >10% downtime in last 6h",
+        "instability_desc_lime": "Unstable: {pct}% downtime in last 6h",
+        "instability_desc_yellow": "High Instability: {pct}% downtime in last 6h",
+        "instability_desc_red": "Critical Instability: {pct}% downtime in last 6h",
 
         // Login Modal
         "login_modal_title": "Sign In to NetMap",

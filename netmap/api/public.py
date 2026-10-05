@@ -1,4 +1,5 @@
 import time
+import asyncio
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 from netmap.db import get_hosts_db
@@ -66,7 +67,10 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
         return {"locations": [], "groups": groups}
 
     host_ids = [h["id"] for h in hosts_rows]
-    sparklines_30m = await ping_engine.get_30m_stats(host_ids)
+    sparklines_30m, downtime_6h = await asyncio.gather(
+        ping_engine.get_30m_stats(host_ids),
+        ping_engine.get_6h_downtime_stats(host_ids)
+    )
 
     # Separate standalone hosts and grouped hosts
     # Grouped hosts are merged by (location, parent_id, grouping) into single Group nodes
@@ -85,6 +89,21 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
         else:
             node_id = f"host:{h['id']}"
             status_res = ping_engine.latest_host_status.get(h["id"])
+            h_stat = downtime_6h.get(h["id"], {"downtime_pct": 0.0, "total_polls": 0, "down_polls": 0})
+            downtime_pct = h_stat["downtime_pct"]
+
+            # Instability thresholds (past 6h downtime):
+            # > 50%: red
+            # > 30%: yellow
+            # > 10%: lime (greenish-yellow)
+            instability_level = None
+            if downtime_pct > 50.0:
+                instability_level = "red"
+            elif downtime_pct > 30.0:
+                instability_level = "yellow"
+            elif downtime_pct > 10.0:
+                instability_level = "lime"
+
             tree_nodes[node_id] = {
                 "id": h["id"],
                 "node_id": node_id,
@@ -100,6 +119,8 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
                 "rtt_ms": status_res.rtt_ms if status_res else None,
                 "error_msg": status_res.error_msg if status_res else None,
                 "last_checked": status_res.timestamp if status_res else None,
+                "downtime_6h_pct": downtime_pct,
+                "instability_level": instability_level,
                 "sparkline_30m": sparklines_30m.get(h["id"], []),
                 "children": []
             }
@@ -211,6 +232,18 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
                 "rtt": avg_round_rtt
             })
 
+        grp_tot_polls = sum(downtime_6h.get(m["id"], {}).get("total_polls", 0) for m in members)
+        grp_down_polls = sum(downtime_6h.get(m["id"], {}).get("down_polls", 0) for m in members)
+        grp_downtime_pct = round((grp_down_polls / grp_tot_polls) * 100, 1) if grp_tot_polls > 0 else 0.0
+
+        grp_instability_level = None
+        if grp_downtime_pct > 50.0:
+            grp_instability_level = "red"
+        elif grp_downtime_pct > 30.0:
+            grp_instability_level = "yellow"
+        elif grp_downtime_pct > 10.0:
+            grp_instability_level = "lime"
+
         tree_nodes[node_id] = {
             "id": first["id"],
             "node_id": node_id,
@@ -229,6 +262,8 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
             "error_msg": "Timeout" if is_grp_up is False else None,
             "last_checked": ping_engine.last_poll_time,
             "member_hosts": member_statuses,
+            "downtime_6h_pct": grp_downtime_pct,
+            "instability_level": grp_instability_level,
             "sparkline_30m": combined_sparkline,
             "children": []
         }
@@ -278,7 +313,9 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
                 "device_up": dev_up,
                 "device_down": dev_down,
                 "device_down_pct": dev_down_pct,
-                "alert_level": alert_level
+                "alert_level": alert_level,
+                "unstable_count": 0,
+                "unstable_max_level": None
             }
         loc_data = locations_map[loc]
         loc_data["total_count"] += 1
@@ -289,6 +326,14 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
             loc_data["up_count"] += 1
         elif node["is_up"] is False:
             loc_data["down_count"] += 1
+
+        if node.get("instability_level"):
+            loc_data["unstable_count"] += 1
+            lvl = node["instability_level"]
+            cur_max = loc_data.get("unstable_max_level")
+            severity_order = {"lime": 1, "yellow": 2, "red": 3}
+            if cur_max is None or severity_order.get(lvl, 0) > severity_order.get(cur_max, 0):
+                loc_data["unstable_max_level"] = lvl
 
         pid = node["parent_id"]
         parent_node_id = host_to_node_id.get(pid) if pid else None
@@ -308,6 +353,14 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
         else:
             all_alert_level = "yellow"
 
+    all_unstable_count = sum(l.get("unstable_count", 0) for l in locations_map.values())
+    all_unstable_max_level = None
+    severity_order = {"lime": 1, "yellow": 2, "red": 3}
+    for l in locations_map.values():
+        lvl = l.get("unstable_max_level")
+        if lvl and (all_unstable_max_level is None or severity_order.get(lvl, 0) > severity_order.get(all_unstable_max_level, 0)):
+            all_unstable_max_level = lvl
+
     locations_list = list(locations_map.values())
     return {
         "locations": locations_list,
@@ -318,7 +371,9 @@ async def get_tree_data(location_filter: Optional[str] = Query(None)):
             "up": all_dev_up,
             "down": all_dev_down,
             "down_pct": all_down_pct,
-            "alert_level": all_alert_level
+            "alert_level": all_alert_level,
+            "unstable_count": all_unstable_count,
+            "unstable_max_level": all_unstable_max_level
         }
     }
 

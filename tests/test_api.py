@@ -485,5 +485,82 @@ async def test_index_page_collapse_controls():
         assert "collapseAllLocations" in html
         assert "expandAllLocations" in html
 
+@pytest.mark.asyncio
+async def test_device_and_group_instability():
+    from netmap.db import get_history_db
+    from netmap.ping_engine import PingResult, ping_engine
+    import time
 
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
 
+        # Create 4 hosts in Location-Alpha:
+        # H1: 0% downtime in last 6h (stable)
+        # H2: 20% downtime in last 6h (>10% and <=30% -> "lime")
+        # H3: 40% downtime in last 6h (>30% and <=50% -> "yellow")
+        # H4: 60% downtime in last 6h (>50% -> "red")
+        h1 = (await client.post("/api/admin/hosts", json={"name": "H1", "ip_address": "10.0.1.1", "location": "Loc-Alpha"})).json()["id"]
+        h2 = (await client.post("/api/admin/hosts", json={"name": "H2", "ip_address": "10.0.1.2", "location": "Loc-Alpha"})).json()["id"]
+        h3 = (await client.post("/api/admin/hosts", json={"name": "H3", "ip_address": "10.0.1.3", "location": "Loc-Alpha"})).json()["id"]
+        h4 = (await client.post("/api/admin/hosts", json={"name": "H4", "ip_address": "10.0.1.4", "location": "Loc-Alpha"})).json()["id"]
+
+        now = int(time.time())
+
+        # Set ALL 4 hosts as CURRENTLY UP in ping_engine
+        for hid in (h1, h2, h3, h4):
+            ping_engine.latest_host_status[hid] = PingResult(host_id=hid, is_up=True, rtt_ms=10.0, timestamp=now)
+
+        # Insert 10 polls in the last 2 hours for each:
+        # H1: 10 up, 0 down (0% downtime)
+        # H2: 8 up, 2 down (20% downtime)
+        # H3: 6 up, 4 down (40% downtime)
+        # H4: 4 up, 6 down (60% downtime)
+        async with get_history_db() as db:
+            for i in range(10):
+                t = now - (i * 600)  # within last 100 minutes (< 6 hours)
+                # H1
+                await db.execute("INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms) VALUES (?, ?, ?, ?)", (h1, t, 1, 10.0))
+                # H2
+                is_up_h2 = 0 if i < 2 else 1
+                await db.execute("INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms) VALUES (?, ?, ?, ?)", (h2, t, is_up_h2, 10.0 if is_up_h2 else None))
+                # H3
+                is_up_h3 = 0 if i < 4 else 1
+                await db.execute("INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms) VALUES (?, ?, ?, ?)", (h3, t, is_up_h3, 10.0 if is_up_h3 else None))
+                # H4
+                is_up_h4 = 0 if i < 6 else 1
+                await db.execute("INSERT INTO ping_history (host_id, timestamp, is_up, rtt_ms) VALUES (?, ?, ?, ?)", (h4, t, is_up_h4, 10.0 if is_up_h4 else None))
+            await db.commit()
+
+        # Query /api/tree
+        res = await client.get("/api/tree")
+        assert res.status_code == 200
+        data = res.json()
+
+        loc = next(l for l in data["locations"] if l["name"] == "Loc-Alpha")
+        
+        # Verify snapshot view: ALL 4 are up right now!
+        assert loc["device_total"] == 4
+        assert loc["device_up"] == 4
+        assert loc["device_down"] == 0
+        assert loc["alert_level"] is None  # Snapshot: 0 down -> no alert
+
+        # Verify instability metrics on location:
+        # 3 unstable devices (H2, H3, H4)
+        # Highest instability is red (H4)
+        assert loc["unstable_count"] == 3
+        assert loc["unstable_max_level"] == "red"
+
+        # Verify individual host node properties:
+        nodes = {n["id"]: n for n in loc["roots"]}
+        assert nodes[h1]["instability_level"] is None
+        assert nodes[h1]["downtime_6h_pct"] == 0.0
+
+        assert nodes[h2]["instability_level"] == "lime"
+        assert nodes[h2]["downtime_6h_pct"] == 20.0
+
+        assert nodes[h3]["instability_level"] == "yellow"
+        assert nodes[h3]["downtime_6h_pct"] == 40.0
+
+        assert nodes[h4]["instability_level"] == "red"
+        assert nodes[h4]["downtime_6h_pct"] == 60.0
