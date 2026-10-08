@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 data/*.db*
 .pytest_cache/
+COMMIT
+COMMIT.md
+
