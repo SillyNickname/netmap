@@ -56,16 +56,3 @@ class SettingsUpdate(BaseModel):
     ping_timeout: Optional[int] = Field(None, ge=1, le=30)
     ping_count: Optional[int] = Field(None, ge=1, le=10)
     retention_hours: Optional[int] = Field(None, ge=24, le=8760)
-    speedtest_enabled: Optional[bool] = None
-    speedtest_server_url: Optional[str] = Field(None, max_length=500)
-    speedtest_duration_seconds: Optional[int] = Field(None, ge=3, le=30)
-    speedtest_visitor_cooldown_hours: Optional[int] = Field(None, ge=0, le=72)
-
-class SpeedtestResultCreate(BaseModel):
-    ping_ms: Optional[float] = Field(None, ge=0.0, le=60000.0)
-    jitter_ms: Optional[float] = Field(None, ge=0.0, le=60000.0)
-    download_max_mbps: Optional[float] = Field(None, ge=0.0, le=1000000.0)
-    download_avg_mbps: Optional[float] = Field(None, ge=0.0, le=1000000.0)
-    upload_max_mbps: Optional[float] = Field(None, ge=0.0, le=1000000.0)
-    upload_avg_mbps: Optional[float] = Field(None, ge=0.0, le=1000000.0)
-

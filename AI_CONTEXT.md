@@ -81,18 +81,15 @@ netmap/
 │   ├── auth.py               # Password hashing (bcrypt), session tokens, RBAC dependencies
 │   ├── models.py             # Pydantic request models with strict bounds and regex
 │   ├── ping_engine.py        # ICMP ping subprocess pool, zombie protection, group evaluation
-│   ├── speedtest_daemon.py   # Standalone lightweight async HTTP speedtest daemon (raw streams)
 │   ├── csv_handler.py        # CSV import/export with parent resolution and cycle checks
 │   ├── main.py               # FastAPI app, ReverseProxyPrefixMiddleware, security headers
 │   └── api/
 │       ├── public.py         # Public read-only endpoints (topology, status, timeline, ranges)
 │       ├── poll.py           # On-demand force-poll trigger endpoint
 │       ├── auth.py           # Login, logout, session verification
-│       ├── admin.py          # CRUD endpoints for hosts, groups, locations, settings, users
-│       └── speedtest.py      # Speedtest endpoints: config, ping, download, upload, results
+│       └── admin.py          # CRUD endpoints for hosts, groups, locations, settings, users
 ├── scripts/
 │   ├── netmap-ctl            # Unified server management CLI (start, stop, restart, status, logs, nginx)
-│   ├── netmap-speedtest-daemon # Standalone speedtest daemon launcher wrapper
 │   ├── init.d/netmap         # SysVinit / LSB service script
 │   ├── openrc/netmap         # OpenRC service script for Alpine Linux
 │   ├── start.sh              # Direct start wrapper
@@ -100,22 +97,17 @@ netmap/
 │   ├── restart.sh            # Direct restart wrapper
 │   └── status.sh             # Direct status wrapper
 ├── static/
-│   ├── css/
-│   │   ├── netmap.css        # Dashboard styling, dark NOC theme, compact/tall modes, badges
-│   │   └── speedtest.css     # Speedometer gauge, animated needle, bar chart, and metrics
+│   ├── css/netmap.css        # Dashboard styling, dark NOC theme, compact/tall modes, badges
 │   └── js/
 │       ├── app.js            # Main dashboard SPA logic, tree rendering, timeline browser
-│       ├── admin.js          # Admin portal SPA logic, table sorting, modals, CRUD, speedtest results
-│       ├── speedtest.js      # Speedtest runner: ping, download, upload, gauge animation, graph
+│       ├── admin.js          # Admin portal SPA logic, table sorting, modals, CRUD
 │       └── i18n.js           # Bilingual localization dictionary (pt-BR default, en)
 ├── templates/
 │   ├── index.html            # Main dashboard HTML template
-│   ├── admin.html            # Admin dashboard HTML template
-│   └── speedtest.html        # Standalone Speedtest HTML template
+│   └── admin.html            # Admin dashboard HTML template
 └── tests/
     ├── test_api.py           # API integration tests using AsyncClient
-    ├── test_netmap.py        # Core unit tests (config, ping engine, CSV, auth)
-    └── test_speedtest.py     # Speedtest tests (cooldown, auth bypass, daemon, streaming)
+    └── test_netmap.py        # Core unit tests (config, ping engine, CSV, auth)
 ```
 
 ---
@@ -177,28 +169,6 @@ netmap/
 - Language toggle persists in `localStorage.getItem("netmap_lang")`.
 - Dynamic UI updates use `data-i18n` attributes and `applyTranslations()`.
 
-### 5.8 Network Speed Measurer & Standalone Daemon (`/speedtest`)
-- **Fast.com / Speedtest.net Interface**:
-  - Dedicated modern page (`templates/speedtest.html`, `static/css/speedtest.css`, `static/js/speedtest.js`).
-  - Animated SVG speedometer gauge with dynamic rotating needle, glowing sweep arc, dual real-time readouts (**Mbps** and **MB/s**).
-  - Time-series throughput bar chart updating in real time across the 5-second download and 5-second upload phases.
-  - Latency (ping round-trip time) and jitter measurement.
-- **Uncompressed & Unbuffered Streaming**:
-  - Endpoints (`/api/speedtest/download`, `/api/speedtest/upload`) and the standalone daemon explicitly disable compression (`Content-Encoding: identity`, `Cache-Control: no-store, no-cache`) to ensure genuine network throughput measurement without CPU gzip inflation.
-- **Visitor Cooldown Rule**:
-  - Unauthenticated visitors are subject to a **2-hour cooldown** enforced on the server by client IP address (`speedtest_results` SQLite table).
-  - Attempts within the cooldown window return HTTP 429 with `cooldown_remaining_seconds`.
-  - Frontend displays a countdown timer and informs visitors when their cooldown expires.
-- **Operator & Admin Privileges**:
-  - Operators and Administrators have **zero cooldown** (unlimited tests).
-  - Both Operator and Admin roles can access the **Speedtest Results** tab in the Admin Portal to view and search historical tests by client IP.
-  - Administrators can delete individual speedtest records.
-- **Configurable Target, Auto-Reload & Standalone Daemon**:
-  - Target server URL configured in `netmap.cfg` (`server_url`) or via Admin Settings tab — clients cannot choose or tamper with the target server.
-  - Can point to local NetMap engine or a remote probe running `scripts/netmap-speedtest-daemon` (`netmap/speedtest_daemon.py`).
-  - `Config` automatically reloads on disk modification (mtime tracking), allowing live target changes without service restarts.
-  - `getTargetBase()` intelligently handles relative subpaths (`/netmap/speedtest/target`, `/speedtest/target`), full URLs, and warns on Mixed Content.
-
 ---
 
 ## 6. Security & Hardening Protocols
@@ -216,9 +186,9 @@ netmap/
 4. **Admin Lockout Protection**:
    - Deleting or demoting the last remaining user with the `admin` role is explicitly blocked with HTTP 400.
 5. **Role-Based Access Control**:
-   - **Public**: Read-only access to dashboard, historical metrics, and rate-limited speed testing (2h cooldown).
-   - **Operator**: Authorized to trigger `/api/poll/force` and view/search speedtest results with 0 cooldown.
-   - **Admin**: Full access to settings, inventory, users, CSV import/export, and speedtest record deletion.
+   - **Public**: Read-only access to dashboard and historical metrics.
+   - **Operator**: Authorized to trigger `/api/poll/force`.
+   - **Admin**: Full access to settings, inventory, users, and CSV import/export.
 
 ---
 
@@ -236,10 +206,9 @@ Always specify `PYTHONPATH=.` when invoking pytest:
 ```bash
 PYTHONPATH=. .venv/bin/pytest -v
 ```
-All 24 tests pass without regressions:
+All 17 tests pass without regressions:
 - `tests/test_api.py` (11 tests: public APIs, auth, grouping, reverse proxy subpaths, admin sorting, warning levels, collapse controls, instability, admin lockout, security headers).
 - `tests/test_netmap.py` (6 tests: config load/save, bcrypt auth, target validation, CSV import/hierarchy, ping engine, CSV purge).
-- `tests/test_speedtest.py` (7 tests: config & ping, download/upload streaming, visitor cooldown enforcement, operator/admin bypass & search, admin deletion, page route, standalone daemon protocol).
 
 *(Note: `test_ping_engine_execution` executes a real ICMP ping to `127.0.0.1`; in sandboxed environments that block ICMP sockets, run with network permissions/unsandboxed).*
 

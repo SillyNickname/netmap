@@ -231,56 +231,7 @@ const TRANSLATIONS = {
         "field_group_name": "Nome do Grupo *",
         "field_group_mode": "Modo de Agregação *",
         "field_group_mode_hint": "'Qualquer host ONLINE' é ideal para clusters balanceados ou com redundância (HA).",
-        "btn_save_group": "Salvar Grupo",
-
-        // Speedtest
-        "nav_speedtest": "🚀 Teste de Velocidade",
-        "tab_speedtest": "🚀 Testes de Velocidade",
-        "st_cooldown_title": "Intervalo de Espera Ativo para Visitantes",
-        "st_cooldown_desc": "Visitantes podem realizar um teste a cada 2 horas. Próximo teste em:",
-        "st_cooldown_auth_hint": "(Operadores e Administradores podem entrar para testar sem intervalo).",
-        "st_server_target": "Servidor de Teste:",
-        "st_ready_msg": "Pronto para iniciar o teste de velocidade",
-        "st_realtime_history": "Histórico do Teste em Tempo Real",
-        "st_metric_latency": "Latência & Jitter",
-        "st_metric_jitter": "Jitter:",
-        "st_metric_download": "Download",
-        "st_metric_upload": "Upload",
-        "st_max": "Máx:",
-        "st_btn_start": "🚀 Iniciar Teste de Velocidade",
-        "st_phase_ping": "Testando Latência (Ping & Jitter)...",
-        "st_phase_download": "Testando Download...",
-        "st_phase_upload": "Testando Upload...",
-        "st_phase_saving": "Salvando resultados...",
-        "st_phase_done": "Teste Concluído com Sucesso!",
-        "st_phase_error": "Erro ao executar o teste.",
-        "st_cooldown_alert": "Aguarde o período de intervalo para executar um novo teste.",
-        "st_your_ip": "Seu IP",
-        "st_admin_title": "Histórico de Testes de Velocidade",
-        "st_admin_desc": "Consulte e pesquise os testes executados pelos usuários da rede por endereço IP.",
-        "st_search_ip_placeholder": "Pesquisar por IP (ex: 192.168.1.50)...",
-        "st_filter_btn": "Filtrar",
-        "st_clear_btn": "Limpar",
-        "st_refresh_btn": "↻ Atualizar",
-        "th_st_ip": "IP do Cliente",
-        "th_st_timestamp": "Data / Hora",
-        "th_st_ping": "Latência / Jitter",
-        "th_st_download": "Download (Méd / Máx)",
-        "th_st_upload": "Upload (Méd / Máx)",
-        "th_st_role": "Tipo de Usuário",
-        "th_st_actions": "Ações",
-        "st_no_results": "Nenhum resultado de teste de velocidade encontrado.",
-        "role_visitor": "Visitante",
-        "nav_login": "🔐 Entrar",
-        "set_speedtest_heading": "Teste de Velocidade / Speedtest",
-        "set_speedtest_desc": "Configuração do motor de medição de velocidade (Fast.com-style) e servidor remoto/daemon.",
-        "set_speedtest_enabled_label": "Habilitar Módulo de Teste de Velocidade",
-        "set_speedtest_url_label": "URL do Servidor / Daemon de Teste (server_url)",
-        "set_speedtest_url_hint": "Deixe vazio para usar o motor local do NetMap. Para servidor remoto com o standalone daemon, informe o caminho do proxy Nginx (ex: /netmap/speedtest/target) ou URL direta (ex: http://IP:8081).",
-        "set_speedtest_duration_label": "Duração de Cada Fase (Segundos)",
-        "set_speedtest_cooldown_label": "Intervalo de Espera para Visitantes (Horas)",
-        "st_local_engine": "NetMap Local Engine (Servidor Local)",
-        "st_phase_failed_conn": "Falha de conexão com o servidor de teste."
+        "btn_save_group": "Salvar Grupo"
     },
     "en": {
         // App header
@@ -507,56 +458,7 @@ const TRANSLATIONS = {
         "field_group_name": "Group Name *",
         "field_group_mode": "Aggregation Mode *",
         "field_group_mode_hint": "'Any Host UP' is ideal for load-balanced or redundant clusters where 1 working node keeps service up.",
-        "btn_save_group": "Save Group",
-
-        // Speedtest
-        "nav_speedtest": "🚀 Speedtest",
-        "tab_speedtest": "🚀 Speedtest Results",
-        "st_cooldown_title": "Visitor Cooldown Period Active",
-        "st_cooldown_desc": "Visitors may run a speed test once every 2 hours. Next available test in:",
-        "st_cooldown_auth_hint": "(Operators and Administrators can log in to test without delay).",
-        "st_server_target": "Test Server Target:",
-        "st_ready_msg": "Ready to start network speed test",
-        "st_realtime_history": "Real-time Speed History",
-        "st_metric_latency": "Latency & Jitter",
-        "st_metric_jitter": "Jitter:",
-        "st_metric_download": "Download",
-        "st_metric_upload": "Upload",
-        "st_max": "Max:",
-        "st_btn_start": "🚀 Start Speed Test",
-        "st_phase_ping": "Testing Latency (Ping & Jitter)...",
-        "st_phase_download": "Testing Download Throughput...",
-        "st_phase_upload": "Testing Upload Throughput...",
-        "st_phase_saving": "Persisting results...",
-        "st_phase_done": "Speed Test Completed Successfully!",
-        "st_phase_error": "Error during speed test execution.",
-        "st_cooldown_alert": "Please wait for cooldown interval before running another test.",
-        "st_your_ip": "Your IP",
-        "st_admin_title": "Speedtest Run History",
-        "st_admin_desc": "Inspect and search throughput tests performed by network clients by IP address.",
-        "st_search_ip_placeholder": "Search by IP (e.g. 192.168.1.50)...",
-        "st_filter_btn": "Filter",
-        "st_clear_btn": "Clear",
-        "st_refresh_btn": "↻ Refresh",
-        "th_st_ip": "Client IP",
-        "th_st_timestamp": "Date / Time",
-        "th_st_ping": "Latency / Jitter",
-        "th_st_download": "Download (Avg / Max)",
-        "th_st_upload": "Upload (Avg / Max)",
-        "th_st_role": "User Role",
-        "th_st_actions": "Actions",
-        "st_no_results": "No speedtest results found.",
-        "role_visitor": "Visitor",
-        "nav_login": "🔐 Login",
-        "set_speedtest_heading": "Network Speedtest Engine",
-        "set_speedtest_desc": "Configuration for the Fast.com-style speed measurement engine and remote probe daemon.",
-        "set_speedtest_enabled_label": "Enable Speedtest Module",
-        "set_speedtest_url_label": "Test Probe Server / Daemon URL (server_url)",
-        "set_speedtest_url_hint": "Leave empty to use built-in local NetMap engine. For remote standalone daemon, enter reverse proxy path (e.g. /netmap/speedtest/target) or direct URL (e.g. http://IP:8081).",
-        "set_speedtest_duration_label": "Phase Duration (Seconds)",
-        "set_speedtest_cooldown_label": "Visitor Cooldown Interval (Hours)",
-        "st_local_engine": "NetMap Local Engine (Local Server)",
-        "st_phase_failed_conn": "Connection failed to test probe server."
+        "btn_save_group": "Save Group"
     }
 };
 
@@ -586,7 +488,6 @@ function setLanguage(lang) {
         if (typeof renderHostsTable === "function") renderHostsTable();
         if (typeof renderGroupsTable === "function") renderGroupsTable();
         if (typeof renderUsersTable === "function") renderUsersTable();
-        if (typeof loadSpeedtestResults === "function") loadSpeedtestResults();
     }
 }
 
@@ -594,7 +495,7 @@ function applyTranslations() {
     document.querySelectorAll("[data-i18n]").forEach(el => {
         const key = el.getAttribute("data-i18n");
         const translation = t(key);
-        if (translation && translation !== key) {
+        if (translation) {
             el.innerHTML = translation;
         }
     });
@@ -602,7 +503,7 @@ function applyTranslations() {
     document.querySelectorAll("[data-i18n-title]").forEach(el => {
         const key = el.getAttribute("data-i18n-title");
         const translation = t(key);
-        if (translation && translation !== key) {
+        if (translation) {
             el.setAttribute("title", translation);
         }
     });
@@ -610,7 +511,7 @@ function applyTranslations() {
     document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
         const key = el.getAttribute("data-i18n-placeholder");
         const translation = t(key);
-        if (translation && translation !== key) {
+        if (translation) {
             el.setAttribute("placeholder", translation);
         }
     });

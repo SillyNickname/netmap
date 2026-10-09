@@ -119,9 +119,6 @@
                 <button id="lang-btn-en" class="lang-btn" onclick="setLanguage('en')">🇺🇸 EN</button>
             </div>
 
-            <a href="{{ base_path }}/speedtest" class="btn btn-outline" style="padding: 5px 12px; border-color: rgba(6,182,212,0.4); color: #22d3ee;" title="Speedtest">
-                <span>🚀</span> <span data-i18n="nav_speedtest">Speedtest</span>
-            </a>
             <a href="{{ base_path }}/" class="btn btn-outline" style="padding: 5px 12px;" data-i18n="back_to_tree">← Voltar ao Mapa</a>
             <span style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
                 👤 <span id="admin-user-display">Admin</span>
@@ -137,7 +134,6 @@
         <button class="admin-tab-btn" data-tab="tab-csv" data-i18n="tab_csv">📂 Importar / Exportar CSV</button>
         <button class="admin-tab-btn" data-tab="tab-settings" data-i18n="tab_settings">⚙️ Configurações (.cfg)</button>
         <button class="admin-tab-btn" data-tab="tab-users" data-i18n="tab_users">👤 Usuários</button>
-        <button class="admin-tab-btn" data-tab="tab-speedtest" data-i18n="tab_speedtest">🚀 Testes de Velocidade</button>
         <button class="admin-tab-btn" data-tab="tab-maintenance" data-i18n="tab_maintenance">🛠️ Manutenção</button>
     </nav>
 
@@ -339,42 +335,6 @@
                             Necessário somente se não usar o cabeçalho X-Forwarded-Prefix no proxy reverso.
                         </div>
                     </div>
-
-                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
-
-                    <h3 style="font-size: 1.05rem; color: #fff; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-                        <span>⚡</span> <span data-i18n="set_speedtest_heading">Teste de Velocidade / Speedtest</span>
-                    </h3>
-                    <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 16px;" data-i18n="set_speedtest_desc">
-                        Configuração do motor de medição de velocidade (Fast.com-style) e servidor remoto/daemon.
-                    </p>
-
-                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
-                        <input type="checkbox" id="set-speedtest-enabled" style="width: 18px; height: 18px; accent-color: var(--primary);">
-                        <label for="set-speedtest-enabled" class="form-label" style="margin: 0; cursor: pointer;" data-i18n="set_speedtest_enabled_label">
-                            Habilitar Módulo de Teste de Velocidade
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="set_speedtest_url_label">URL do Servidor / Daemon de Teste (server_url)</label>
-                        <input type="text" id="set-speedtest-url" class="form-control" placeholder="ex: /netmap/speedtest/target ou http://192.168.1.50:8081">
-                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;" data-i18n="set_speedtest_url_hint">
-                            Deixe vazio para usar o motor local do NetMap. Para servidor remoto com o standalone daemon, informe o caminho do proxy Nginx (ex: /netmap/speedtest/target) ou URL direta (ex: http://IP:8081).
-                        </div>
-                    </div>
-
-                    <div class="grid-2">
-                        <div class="form-group">
-                            <label class="form-label" data-i18n="set_speedtest_duration_label">Duração de Cada Fase (Segundos)</label>
-                            <input type="number" id="set-speedtest-duration" class="form-control" min="3" max="30" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" data-i18n="set_speedtest_cooldown_label">Intervalo de Espera para Visitantes (Horas)</label>
-                            <input type="number" id="set-speedtest-cooldown" class="form-control" min="0" max="72" required>
-                        </div>
-                    </div>
-
                     <button type="submit" class="btn btn-primary" style="margin-top: 12px;">
                         <span data-i18n="btn_save_settings">💾 Salvar Configurações no netmap.cfg</span>
                     </button>
@@ -435,57 +395,7 @@
             </div>
         </section>
 
-        <!-- TAB 6: SPEEDTEST RESULTS -->
-        <section id="tab-speedtest" class="admin-tab-panel">
-            <div class="panel-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-                    <div>
-                        <h2 style="font-size: 1.2rem; color: #fff;" data-i18n="st_admin_title">Histórico de Testes de Velocidade</h2>
-                        <p style="font-size: 0.82rem; color: var(--text-dim);" data-i18n="st_admin_desc">Consulte e pesquise os testes executados pelos usuários da rede por endereço IP.</p>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                        <input type="text" id="speedtest-search-ip" class="form-control" style="width: 220px; padding: 6px 12px; font-size: 0.85rem;" placeholder="Pesquisar por IP..." data-i18n-placeholder="st_search_ip_placeholder" onkeydown="if(event.key==='Enter') loadSpeedtestResults()">
-                        <button class="btn btn-primary" onclick="loadSpeedtestResults()" style="padding: 6px 14px;" data-i18n="st_filter_btn">Filtrar</button>
-                        <button class="btn btn-outline" onclick="clearSpeedtestFilter()" style="padding: 6px 12px;" data-i18n="st_clear_btn">Limpar</button>
-                        <button class="btn btn-outline" onclick="loadSpeedtestResults()" style="padding: 6px 12px;" data-i18n="st_refresh_btn">↻ Atualizar</button>
-                    </div>
-                </div>
-
-                <div style="overflow-x: auto;">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th><span data-i18n="th_st_ip">IP do Cliente</span></th>
-                                <th><span data-i18n="th_st_timestamp">Data / Hora</span></th>
-                                <th><span data-i18n="th_st_ping">Latência / Jitter</span></th>
-                                <th><span data-i18n="th_st_download">Download (Méd / Máx)</span></th>
-                                <th><span data-i18n="th_st_upload">Upload (Méd / Máx)</span></th>
-                                <th><span data-i18n="th_st_role">Tipo de Usuário</span></th>
-                                <th style="text-align: right;"><span data-i18n="th_st_actions">Ações</span></th>
-                            </tr>
-                        </thead>
-                        <tbody id="speedtest-results-tbody">
-                            <!-- Populated dynamically -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="speedtest-empty-msg" style="display: none; padding: 30px; text-align: center; color: var(--text-dim); font-size: 0.9rem;" data-i18n="st_no_results">
-                    Nenhum resultado de teste de velocidade encontrado.
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 0.85rem; color: var(--text-muted);">
-                    <div>Total: <strong id="speedtest-total-count">0</strong> testes registrados</div>
-                    <div id="speedtest-pagination" style="display: flex; gap: 8px;">
-                        <button id="speedtest-prev-btn" class="btn btn-outline" style="padding: 3px 10px; font-size: 0.8rem;" onclick="prevSpeedtestPage()" disabled>← Anterior</button>
-                        <span id="speedtest-page-info" style="align-self: center;">Página 1</span>
-                        <button id="speedtest-next-btn" class="btn btn-outline" style="padding: 3px 10px; font-size: 0.8rem;" onclick="nextSpeedtestPage()" disabled>Próxima →</button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- TAB 7: MAINTENANCE -->
+        <!-- TAB 6: MAINTENANCE -->
         <section id="tab-maintenance" class="admin-tab-panel">
             <div class="panel-card" style="max-width: 700px;">
                 <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;" data-i18n="maint_title">Saúde dos Bancos de Dados & Armazenamento</h2>
@@ -607,7 +517,7 @@
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="{{ base_path }}/static/js/i18n.js?v=1.5.0"></script>
-    <script src="{{ base_path }}/static/js/admin.js?v=1.5.0"></script>
+    <script src="{{ base_path }}/static/js/i18n.js?v=1.1.1"></script>
+    <script src="{{ base_path }}/static/js/admin.js?v=1.1.1"></script>
 </body>
 </html>

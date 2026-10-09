@@ -19,8 +19,6 @@ from netmap.api.auth import router as auth_router
 from netmap.api.public import router as public_router
 from netmap.api.poll import router as poll_router
 from netmap.api.admin import router as admin_router
-from netmap.api.speedtest import router as speedtest_router
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -95,7 +93,6 @@ app.include_router(auth_router)
 app.include_router(public_router)
 app.include_router(poll_router)
 app.include_router(admin_router)
-app.include_router(speedtest_router)
 
 def get_base_path(request: Request) -> str:
     return request.scope.get("root_path", "").rstrip("/")
@@ -108,15 +105,6 @@ async def index_page(request: Request):
         context={"base_path": get_base_path(request)}
     )
 
-@app.get("/speedtest", response_class=HTMLResponse)
-@app.get("/speedtest/", response_class=HTMLResponse)
-async def speedtest_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="speedtest.html",
-        context={"base_path": get_base_path(request)}
-    )
-
 @app.get("/admin", response_class=HTMLResponse)
 @app.get("/admin/", response_class=HTMLResponse)
 async def admin_page(request: Request):
@@ -125,4 +113,3 @@ async def admin_page(request: Request):
         name="admin.html",
         context={"base_path": get_base_path(request)}
     )
-
