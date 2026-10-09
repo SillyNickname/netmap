@@ -11,7 +11,7 @@ import pytest_asyncio
 from pathlib import Path
 from netmap.config import Config
 from netmap.auth import hash_password, verify_password
-from netmap.ping_engine import PingEngine, is_valid_target
+from netmap.ping_engine import PingEngine, PingResult, is_valid_target
 from netmap.csv_handler import import_hosts_from_csv, SAMPLE_CSV_CONTENT
 from netmap.db import init_databases, get_hosts_db, get_history_db
 
@@ -116,7 +116,7 @@ async def test_csv_import_and_hierarchy():
             assert row["aggregation_mode"] == "all"
 
 @pytest.mark.asyncio
-async def test_ping_engine_execution():
+async def test_ping_engine_execution(monkeypatch):
     # Insert a test host pointing to 127.0.0.1
     async with get_hosts_db() as db:
         await db.execute(
@@ -126,6 +126,10 @@ async def test_ping_engine_execution():
         await db.commit()
 
     engine = PingEngine()
+    async def mock_ping(host_id, ip_or_host, semaphore):
+        return PingResult(host_id=host_id, is_up=True, rtt_ms=1.2)
+    monkeypatch.setattr(engine, "ping_host", mock_ping)
+
     poll_res = await engine.execute_poll()
     assert poll_res["polled_count"] >= 1
 

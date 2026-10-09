@@ -608,6 +608,14 @@ async function loadSettings() {
         if (prefixInput) {
             prefixInput.value = data.url_prefix || "";
         }
+        const speedtestEnabled = document.getElementById("set-speedtest-enabled");
+        if (speedtestEnabled) speedtestEnabled.checked = !!data.speedtest_enabled;
+        const speedtestUrl = document.getElementById("set-speedtest-url");
+        if (speedtestUrl) speedtestUrl.value = data.speedtest_server_url || "";
+        const speedtestDuration = document.getElementById("set-speedtest-duration");
+        if (speedtestDuration) speedtestDuration.value = data.speedtest_duration_seconds ?? 5;
+        const speedtestCooldown = document.getElementById("set-speedtest-cooldown");
+        if (speedtestCooldown) speedtestCooldown.value = data.speedtest_visitor_cooldown_hours ?? 2;
     } catch (err) {
         showToast("Error loading settings", "error");
     }
@@ -616,14 +624,18 @@ async function loadSettings() {
 async function handleSettingsSubmit(e) {
     e.preventDefault();
     const payload = {
-        interval_seconds: parseInt(document.getElementById("set-interval").value),
-        ping_threads: parseInt(document.getElementById("set-threads").value),
-        ping_timeout: parseInt(document.getElementById("set-timeout").value),
-        ping_count: parseInt(document.getElementById("set-count").value),
-        retention_hours: parseInt(document.getElementById("set-retention").value),
-        server_port: parseInt(document.getElementById("set-port").value),
+        interval_seconds: parseInt(document.getElementById("set-interval").value, 10),
+        ping_threads: parseInt(document.getElementById("set-threads").value, 10),
+        ping_timeout: parseInt(document.getElementById("set-timeout").value, 10),
+        ping_count: parseInt(document.getElementById("set-count").value, 10),
+        retention_hours: parseInt(document.getElementById("set-retention").value, 10),
+        server_port: parseInt(document.getElementById("set-port").value, 10),
         server_host: document.getElementById("set-host").value.trim(),
-        url_prefix: document.getElementById("set-prefix") ? document.getElementById("set-prefix").value.trim() : ""
+        url_prefix: document.getElementById("set-prefix") ? document.getElementById("set-prefix").value.trim() : "",
+        speedtest_enabled: document.getElementById("set-speedtest-enabled") ? document.getElementById("set-speedtest-enabled").checked : true,
+        speedtest_server_url: document.getElementById("set-speedtest-url") ? document.getElementById("set-speedtest-url").value.trim() : "",
+        speedtest_duration_seconds: document.getElementById("set-speedtest-duration") ? parseInt(document.getElementById("set-speedtest-duration").value, 10) : 5,
+        speedtest_visitor_cooldown_hours: document.getElementById("set-speedtest-cooldown") ? parseInt(document.getElementById("set-speedtest-cooldown").value, 10) : 2
     };
 
     try {

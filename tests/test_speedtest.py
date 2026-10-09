@@ -52,6 +52,7 @@ history_db = {history_db_path}
     monkeypatch.setattr("netmap.config.config", test_config)
     monkeypatch.setattr("netmap.db.config", test_config)
     monkeypatch.setattr("netmap.api.speedtest.config", test_config)
+    monkeypatch.setattr("netmap.api.admin.config", test_config)
 
     await init_databases()
     return test_config
@@ -275,3 +276,31 @@ async def test_speedtest_standalone_daemon():
             u_res = await client.post("/upload", content=b"Y" * 32768)
             assert u_res.status_code == 200
             assert u_res.json()["received_bytes"] == 32768
+
+
+@pytest.mark.asyncio
+async def test_speedtest_config_auto_reload_and_admin_settings():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Login as admin
+        await client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+
+        # 2. Update speedtest settings via admin API
+        update_payload = {
+            "speedtest_enabled": True,
+            "speedtest_server_url": "/netmap/speedtest/target",
+            "speedtest_duration_seconds": 8,
+            "speedtest_visitor_cooldown_hours": 1
+        }
+        put_res = await client.put("/api/admin/settings", json=update_payload)
+        assert put_res.status_code == 200
+        assert put_res.json()["success"] is True
+
+        # 3. Verify /api/speedtest/config reflects the new server_url
+        cfg_res = await client.get("/api/speedtest/config")
+        assert cfg_res.status_code == 200
+        cfg_data = cfg_res.json()
+        assert cfg_data["server_url"] == "/netmap/speedtest/target"
+        assert cfg_data["duration_seconds"] == 8
+        assert cfg_data["visitor_cooldown_hours"] == 1
+

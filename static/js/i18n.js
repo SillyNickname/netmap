@@ -271,7 +271,16 @@ const TRANSLATIONS = {
         "th_st_actions": "Ações",
         "st_no_results": "Nenhum resultado de teste de velocidade encontrado.",
         "role_visitor": "Visitante",
-        "nav_login": "🔐 Entrar"
+        "nav_login": "🔐 Entrar",
+        "set_speedtest_heading": "Teste de Velocidade / Speedtest",
+        "set_speedtest_desc": "Configuração do motor de medição de velocidade (Fast.com-style) e servidor remoto/daemon.",
+        "set_speedtest_enabled_label": "Habilitar Módulo de Teste de Velocidade",
+        "set_speedtest_url_label": "URL do Servidor / Daemon de Teste (server_url)",
+        "set_speedtest_url_hint": "Deixe vazio para usar o motor local do NetMap. Para servidor remoto com o standalone daemon, informe o caminho do proxy Nginx (ex: /netmap/speedtest/target) ou URL direta (ex: http://IP:8081).",
+        "set_speedtest_duration_label": "Duração de Cada Fase (Segundos)",
+        "set_speedtest_cooldown_label": "Intervalo de Espera para Visitantes (Horas)",
+        "st_local_engine": "NetMap Local Engine (Servidor Local)",
+        "st_phase_failed_conn": "Falha de conexão com o servidor de teste."
     },
     "en": {
         // App header
@@ -538,7 +547,16 @@ const TRANSLATIONS = {
         "th_st_actions": "Actions",
         "st_no_results": "No speedtest results found.",
         "role_visitor": "Visitor",
-        "nav_login": "🔐 Login"
+        "nav_login": "🔐 Login",
+        "set_speedtest_heading": "Network Speedtest Engine",
+        "set_speedtest_desc": "Configuration for the Fast.com-style speed measurement engine and remote probe daemon.",
+        "set_speedtest_enabled_label": "Enable Speedtest Module",
+        "set_speedtest_url_label": "Test Probe Server / Daemon URL (server_url)",
+        "set_speedtest_url_hint": "Leave empty to use built-in local NetMap engine. For remote standalone daemon, enter reverse proxy path (e.g. /netmap/speedtest/target) or direct URL (e.g. http://IP:8081).",
+        "set_speedtest_duration_label": "Phase Duration (Seconds)",
+        "set_speedtest_cooldown_label": "Visitor Cooldown Interval (Hours)",
+        "st_local_engine": "NetMap Local Engine (Local Server)",
+        "st_phase_failed_conn": "Connection failed to test probe server."
     }
 };
 

@@ -161,14 +161,29 @@ function startCooldownCountdown() {
 
 // Resolve effective speedtest server endpoint
 function getTargetBase() {
-    if (speedtestConfig.server_url && speedtestConfig.server_url.trim().length > 0) {
-        let u = speedtestConfig.server_url.trim().replace(/\/$/, "");
-        if (u.startsWith("/")) {
-            return u;
+    const raw = (speedtestConfig.server_url || "").trim();
+    if (!raw) {
+        return `${APP_BASE}/api/speedtest`;
+    }
+    let u = raw.replace(/\/+$/, "");
+    // Scheme-qualified URLs
+    if (/^https?:\/\//i.test(u)) {
+        return u;
+    }
+    // IP:port or hostname:port without scheme (e.g. 192.168.1.50:8081)
+    if (/^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/i.test(u) || /^[a-zA-Z0-9.-]+:\d+(\/.*)?$/i.test(u)) {
+        const scheme = window.location.protocol === "https:" ? "https://" : "http://";
+        return `${scheme}${u}`;
+    }
+    // Path starting with /
+    if (u.startsWith("/")) {
+        if (APP_BASE && !u.startsWith(APP_BASE + "/") && u !== APP_BASE) {
+            return `${APP_BASE}${u}`;
         }
         return u;
     }
-    return `${APP_BASE}/api/speedtest`;
+    // Relative path
+    return APP_BASE ? `${APP_BASE}/${u}` : `/${u}`;
 }
 
 // 1. Latency & Jitter Test
@@ -186,17 +201,21 @@ async function runPingTest(targetBase) {
                 cache: "no-store",
                 headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" }
             });
-            await resp.json();
-            const rtt = performance.now() - start;
-            pingTimes.push(rtt);
+            if (!resp.ok) {
+                console.warn(`[Speedtest Ping] HTTP error ${resp.status} from ${targetBase}/ping`);
+            } else {
+                await resp.json();
+                const rtt = performance.now() - start;
+                pingTimes.push(rtt);
+            }
         } catch (e) {
-            console.warn("Ping failed, skipping round", e);
+            console.error(`[Speedtest Ping] Error reaching ${targetBase}/ping:`, e);
         }
         await new Promise(r => setTimeout(r, 80));
     }
 
     if (pingTimes.length === 0) {
-        return { ping: 0, jitter: 0 };
+        return { ping: 0, jitter: 0, pingCount: 0 };
     }
 
     const avgPing = pingTimes.reduce((a, b) => a + b, 0) / pingTimes.length;
@@ -212,7 +231,7 @@ async function runPingTest(targetBase) {
     document.getElementById("metric-ping").textContent = avgPing.toFixed(1);
     document.getElementById("metric-jitter").textContent = jitter.toFixed(1);
 
-    return { ping: avgPing, jitter };
+    return { ping: avgPing, jitter, pingCount: pingTimes.length };
 }
 
 // 2. Download Test (5 seconds)
@@ -242,6 +261,10 @@ async function runDownloadTest(targetBase, durationSeconds) {
                         cache: "no-store",
                         signal: abortController.signal
                     });
+                    if (!resp.ok) {
+                        console.error(`[Speedtest Download] HTTP ${resp.status} from ${targetBase}/download`);
+                        break;
+                    }
                     if (!resp.body) break;
                     const reader = resp.body.getReader();
                     while (true) {
@@ -257,6 +280,7 @@ async function runDownloadTest(targetBase, durationSeconds) {
                     }
                 } catch (e) {
                     if (e.name === "AbortError") break;
+                    console.error(`[Speedtest Download] Error streaming from ${targetBase}/download:`, e);
                     break;
                 }
             }
@@ -299,7 +323,7 @@ async function runDownloadTest(targetBase, durationSeconds) {
     document.getElementById("metric-dl-mbs").textContent = (avgMbps / 8).toFixed(2);
 
     updateGauge(avgMbps);
-    return { avgMbps, maxMbps };
+    return { avgMbps, maxMbps, totalBytes };
 }
 
 // 3. Upload Test (5 seconds)
@@ -338,9 +362,12 @@ async function runUploadTest(targetBase, durationSeconds) {
                     });
                     if (resp.ok) {
                         totalBytesUploaded += chunkSizeBytes;
+                    } else {
+                        console.error(`[Speedtest Upload] HTTP ${resp.status} from ${targetBase}/upload`);
                     }
                 } catch (e) {
                     if (e.name === "AbortError") break;
+                    console.error(`[Speedtest Upload] Error uploading to ${targetBase}/upload:`, e);
                     break;
                 }
             }
@@ -382,7 +409,7 @@ async function runUploadTest(targetBase, durationSeconds) {
     document.getElementById("metric-ul-mbs").textContent = (avgMbps / 8).toFixed(2);
 
     updateGauge(avgMbps);
-    return { avgMbps, maxMbps };
+    return { avgMbps, maxMbps, totalBytesUploaded };
 }
 
 // Main Test Orchestrator
@@ -411,16 +438,24 @@ async function startSpeedTest() {
 
     const targetBase = getTargetBase();
     const duration = speedtestConfig.duration_seconds || 5;
+    console.log(`[NetMap Speedtest] Starting test against probe target: "${targetBase}" (Configured: "${speedtestConfig.server_url || ''}")`);
 
     try {
         // Step 1: Latency & Jitter
-        const { ping, jitter } = await runPingTest(targetBase);
+        const { ping, jitter, pingCount } = await runPingTest(targetBase);
 
         // Step 2: Download Test
-        const { avgMbps: dlAvg, maxMbps: dlMax } = await runDownloadTest(targetBase, duration);
+        const { avgMbps: dlAvg, maxMbps: dlMax, totalBytes: dlBytes } = await runDownloadTest(targetBase, duration);
 
         // Step 3: Upload Test
-        const { avgMbps: ulAvg, maxMbps: ulMax } = await runUploadTest(targetBase, duration);
+        const { avgMbps: ulAvg, maxMbps: ulMax, totalBytesUploaded: ulBytes } = await runUploadTest(targetBase, duration);
+
+        // Connection failure guard: check if any bytes transferred or pings succeeded
+        if ((!dlBytes || dlBytes === 0) && (!ulBytes || ulBytes === 0) && (!pingCount || pingCount === 0)) {
+            setPhaseTitle(`❌ ${t("st_phase_failed_conn", "Falha de conexão com o servidor de teste.")} (${targetBase})`, false);
+            console.error(`[NetMap Speedtest] Could not connect or transfer data with target "${targetBase}". Please check network/proxy.`);
+            return;
+        }
 
         // Step 4: Submit Results to NetMap server
         setPhaseTitle(t("st_phase_saving", "Salvando resultados..."), false);
@@ -497,11 +532,28 @@ async function initSpeedtest() {
             // Display server target
             const targetEl = document.getElementById("server-target-display");
             const ipEl = document.getElementById("client-ip-badge");
+            const targetBase = getTargetBase();
+            console.log(`[NetMap Speedtest] Initialized config:`, speedtestConfig);
+            console.log(`[NetMap Speedtest] Resolved probe target endpoint: "${targetBase}"`);
+
             if (targetEl) {
-                targetEl.textContent = speedtestConfig.server_url ? speedtestConfig.server_url : "NetMap Local Engine";
+                if (speedtestConfig.server_url && speedtestConfig.server_url.trim().length > 0) {
+                    targetEl.innerHTML = `🛰️ <span style="color: #22d3ee;" title="${escapeHtml(targetBase)}">${escapeHtml(speedtestConfig.server_url)}</span>`;
+                } else {
+                    targetEl.innerHTML = `🎯 <span style="color: #94a3b8;">${escapeHtml(t("st_local_engine", "NetMap Local Engine (Servidor Local)"))}</span>`;
+                }
             }
             if (ipEl && speedtestConfig.client_ip) {
                 ipEl.textContent = `(${t("st_your_ip", "Seu IP")}: ${speedtestConfig.client_ip})`;
+            }
+
+            // Check Mixed Content warning
+            if (window.location.protocol === "https:" && targetBase.startsWith("http://")) {
+                console.warn(`[NetMap Speedtest] Mixed Content Warning: Site is HTTPS but probe target is HTTP ("${targetBase}").`);
+                const phaseEl = document.getElementById("phase-title");
+                if (phaseEl) {
+                    phaseEl.innerHTML = `<span style="color: #f59e0b; font-size: 0.85rem;">⚠️ Atenção: Página HTTPS acessando probe HTTP (${escapeHtml(targetBase)}). Se o navegador bloquear, utilize o proxy Nginx (/netmap/speedtest/target) ou HTTPS.</span>`;
+                }
             }
 
             if (speedtestConfig.cooldown_remaining_seconds > 0) {

@@ -15,7 +15,19 @@ class Config:
     def __init__(self, config_path: Path = DEFAULT_CONFIG_PATH):
         self.config_path = config_path
         self._parser = configparser.ConfigParser()
+        self._last_mtime = 0.0
         self.load()
+
+    def _check_reload(self) -> None:
+        try:
+            if self.config_path.exists():
+                mtime = os.path.getmtime(self.config_path)
+                if mtime > self._last_mtime:
+                    self._parser.read(self.config_path)
+                    self._last_mtime = mtime
+                    self._ensure_keys()
+        except OSError:
+            pass
 
     def load(self) -> None:
         if not self.config_path.exists():
@@ -23,6 +35,10 @@ class Config:
             self.save()
         else:
             self._parser.read(self.config_path)
+            try:
+                self._last_mtime = os.path.getmtime(self.config_path)
+            except OSError:
+                self._last_mtime = 0.0
             self._ensure_keys()
 
     def _set_defaults(self) -> None:
@@ -75,22 +91,30 @@ class Config:
     def save(self) -> None:
         with open(self.config_path, "w") as f:
             self._parser.write(f)
+        try:
+            self._last_mtime = os.path.getmtime(self.config_path)
+        except OSError:
+            pass
 
     # Server settings
     @property
     def server_host(self) -> str:
+        self._check_reload()
         return self._parser.get("server", "host", fallback="0.0.0.0")
 
     @property
     def server_port(self) -> int:
+        self._check_reload()
         return self._parser.getint("server", "port", fallback=8080)
 
     @property
     def secret_key(self) -> str:
+        self._check_reload()
         return self._parser.get("server", "secret_key", fallback="netmap-secret-key-change-in-production")
 
     @property
     def url_prefix(self) -> str:
+        self._check_reload()
         prefix = self._parser.get("server", "url_prefix", fallback="").strip()
         if prefix and not prefix.startswith("/"):
             prefix = "/" + prefix
@@ -99,53 +123,65 @@ class Config:
     # Poller settings
     @property
     def poller_interval_seconds(self) -> int:
+        self._check_reload()
         return max(5, self._parser.getint("poller", "interval_seconds", fallback=60))
 
     @property
     def ping_threads(self) -> int:
+        self._check_reload()
         return max(1, self._parser.getint("poller", "ping_threads", fallback=20))
 
     @property
     def ping_timeout(self) -> int:
+        self._check_reload()
         return max(1, self._parser.getint("poller", "ping_timeout", fallback=2))
 
     @property
     def ping_count(self) -> int:
+        self._check_reload()
         return max(1, self._parser.getint("poller", "ping_count", fallback=1))
 
     # History settings
     @property
     def retention_hours(self) -> int:
+        self._check_reload()
         return max(24, self._parser.getint("history", "retention_hours", fallback=48))
 
     # Database settings
     @property
     def hosts_db_path(self) -> str:
+        self._check_reload()
         return self._parser.get("database", "hosts_db", fallback="data/hosts.db")
 
     @property
     def history_db_path(self) -> str:
+        self._check_reload()
         return self._parser.get("database", "history_db", fallback="data/history.db")
 
     # Speedtest settings
     @property
     def speedtest_enabled(self) -> bool:
+        self._check_reload()
         return self._parser.getboolean("speedtest", "enabled", fallback=True)
 
     @property
     def speedtest_server_url(self) -> str:
+        self._check_reload()
         return self._parser.get("speedtest", "server_url", fallback="").strip()
 
     @property
     def speedtest_duration_seconds(self) -> int:
+        self._check_reload()
         return self._parser.getint("speedtest", "duration_seconds", fallback=5)
 
     @property
     def speedtest_visitor_cooldown_hours(self) -> int:
+        self._check_reload()
         return self._parser.getint("speedtest", "visitor_cooldown_hours", fallback=2)
 
     def update_settings(self, updates: Dict[str, Any]) -> None:
         """Update settings and persist to netmap.cfg"""
+        self._check_reload()
         if "server_host" in updates:
             self._parser.set("server", "host", str(updates["server_host"]).strip())
         if "server_port" in updates:
@@ -187,6 +223,7 @@ class Config:
         self.save()
 
     def to_dict(self) -> Dict[str, Any]:
+        self._check_reload()
         return {
             "server_host": self.server_host,
             "server_port": self.server_port,

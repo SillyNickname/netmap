@@ -193,9 +193,11 @@ netmap/
   - Operators and Administrators have **zero cooldown** (unlimited tests).
   - Both Operator and Admin roles can access the **Speedtest Results** tab in the Admin Portal to view and search historical tests by client IP.
   - Administrators can delete individual speedtest records.
-- **Configurable Target & Standalone Daemon**:
-  - Target server URL configured in `netmap.cfg` (`server_url`) — clients cannot choose or tamper with the target server.
-  - Can point to local NetMap or a remote probe running `scripts/netmap-speedtest-daemon` (`netmap/speedtest_daemon.py`).
+- **Configurable Target, Auto-Reload & Standalone Daemon**:
+  - Target server URL configured in `netmap.cfg` (`server_url`) or via Admin Settings tab — clients cannot choose or tamper with the target server.
+  - Can point to local NetMap engine or a remote probe running `scripts/netmap-speedtest-daemon` (`netmap/speedtest_daemon.py`).
+  - `Config` automatically reloads on disk modification (mtime tracking), allowing live target changes without service restarts.
+  - `getTargetBase()` intelligently handles relative subpaths (`/netmap/speedtest/target`, `/speedtest/target`), full URLs, and warns on Mixed Content.
 
 ---
 
