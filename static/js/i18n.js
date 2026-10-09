@@ -269,7 +269,9 @@ const TRANSLATIONS = {
         "th_st_upload": "Upload (Méd / Máx)",
         "th_st_role": "Tipo de Usuário",
         "th_st_actions": "Ações",
-        "st_no_results": "Nenhum resultado de teste de velocidade encontrado."
+        "st_no_results": "Nenhum resultado de teste de velocidade encontrado.",
+        "role_visitor": "Visitante",
+        "nav_login": "🔐 Entrar"
     },
     "en": {
         // App header
@@ -534,7 +536,9 @@ const TRANSLATIONS = {
         "th_st_upload": "Upload (Avg / Max)",
         "th_st_role": "User Role",
         "th_st_actions": "Actions",
-        "st_no_results": "No speedtest results found."
+        "st_no_results": "No speedtest results found.",
+        "role_visitor": "Visitor",
+        "nav_login": "🔐 Login"
     }
 };
 
@@ -564,6 +568,7 @@ function setLanguage(lang) {
         if (typeof renderHostsTable === "function") renderHostsTable();
         if (typeof renderGroupsTable === "function") renderGroupsTable();
         if (typeof renderUsersTable === "function") renderUsersTable();
+        if (typeof loadSpeedtestResults === "function") loadSpeedtestResults();
     }
 }
 
@@ -571,7 +576,7 @@ function applyTranslations() {
     document.querySelectorAll("[data-i18n]").forEach(el => {
         const key = el.getAttribute("data-i18n");
         const translation = t(key);
-        if (translation) {
+        if (translation && translation !== key) {
             el.innerHTML = translation;
         }
     });
@@ -579,7 +584,7 @@ function applyTranslations() {
     document.querySelectorAll("[data-i18n-title]").forEach(el => {
         const key = el.getAttribute("data-i18n-title");
         const translation = t(key);
-        if (translation) {
+        if (translation && translation !== key) {
             el.setAttribute("title", translation);
         }
     });
@@ -587,7 +592,7 @@ function applyTranslations() {
     document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
         const key = el.getAttribute("data-i18n-placeholder");
         const translation = t(key);
-        if (translation) {
+        if (translation && translation !== key) {
             el.setAttribute("placeholder", translation);
         }
     });

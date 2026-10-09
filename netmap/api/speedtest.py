@@ -48,6 +48,34 @@ async def require_operator_or_admin(request: Request) -> Dict[str, Any]:
     return user
 
 
+async def ensure_speedtest_table(db) -> None:
+    """Auto-migration helper ensuring speedtest_results exists"""
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS speedtest_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_ip TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            ping_ms REAL,
+            jitter_ms REAL,
+            download_max_mbps REAL,
+            download_avg_mbps REAL,
+            upload_max_mbps REAL,
+            upload_avg_mbps REAL,
+            role TEXT NOT NULL DEFAULT 'visitor',
+            user_agent TEXT
+        );
+    """)
+    await db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_speedtest_client_ip 
+        ON speedtest_results(client_ip, timestamp DESC);
+    """)
+    await db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_speedtest_timestamp 
+        ON speedtest_results(timestamp DESC);
+    """)
+    await db.commit()
+
+
 @router.get("/config")
 async def get_speedtest_config(request: Request):
     """Returns configuration and visitor cooldown status for the requesting client IP"""
@@ -63,9 +91,10 @@ async def get_speedtest_config(request: Request):
     cooldown_remaining = 0
     role = user["role"] if user else "visitor"
 
-    # Visitors are subject to cooldown
-    if not user and cooldown_seconds > 0:
-        async with get_hosts_db() as db:
+    async with get_hosts_db() as db:
+        await ensure_speedtest_table(db)
+        # Visitors are subject to cooldown
+        if not user and cooldown_seconds > 0:
             async with db.execute(
                 """
                 SELECT timestamp FROM speedtest_results 
@@ -172,9 +201,13 @@ async def record_speedtest_result(payload: SpeedtestResultCreate, request: Reque
     cooldown_seconds = config.speedtest_visitor_cooldown_hours * 3600
     role = user["role"] if user else "visitor"
 
-    # Enforce visitor cooldown on submission
-    if not user and cooldown_seconds > 0:
-        async with get_hosts_db() as db:
+    user_agent = request.headers.get("User-Agent", "")[:255]
+
+    async with get_hosts_db() as db:
+        await ensure_speedtest_table(db)
+
+        # Enforce visitor cooldown on submission
+        if not user and cooldown_seconds > 0:
             async with db.execute(
                 """
                 SELECT timestamp FROM speedtest_results 
@@ -193,9 +226,6 @@ async def record_speedtest_result(payload: SpeedtestResultCreate, request: Reque
                             detail=f"Visitor cooldown active. Please wait {remaining} seconds."
                         )
 
-    user_agent = request.headers.get("User-Agent", "")[:255]
-
-    async with get_hosts_db() as db:
         cursor = await db.execute(
             """
             INSERT INTO speedtest_results 
@@ -240,6 +270,7 @@ async def list_speedtest_results(
     Accessible to both Operator and Admin users.
     """
     async with get_hosts_db() as db:
+        await ensure_speedtest_table(db)
         if search_ip and search_ip.strip():
             query_ip = f"%{search_ip.strip()}%"
             async with db.execute(

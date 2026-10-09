@@ -897,11 +897,11 @@ async function loadSpeedtestResults() {
             const ulMax = r.upload_max_mbps != null ? `${r.upload_max_mbps.toFixed(2)} Mbps` : "--";
             const ulMbs = r.upload_avg_mbps != null ? ` (${(r.upload_avg_mbps / 8).toFixed(2)} MB/s)` : "";
 
-            let roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(148,163,184,0.15); color: #94a3b8;">Visitante</span>`;
+            let roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(148,163,184,0.15); color: #94a3b8;">${t("role_visitor", "Visitante")}</span>`;
             if (r.role === "admin") {
-                roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.2); color: #c084fc; font-weight:600;">Admin</span>`;
+                roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.2); color: #c084fc; font-weight:600;">${t("role_admin", "Admin")}</span>`;
             } else if (r.role === "operator") {
-                roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.2); color: #60a5fa; font-weight:600;">Operador</span>`;
+                roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.2); color: #60a5fa; font-weight:600;">${t("role_operator", "Operador")}</span>`;
             }
 
             const deleteAction = currentUserRole === "admin"
@@ -915,11 +915,11 @@ async function loadSpeedtestResults() {
                     <td><span style="color: var(--up-color); font-weight: 600;">${pingStr}</span><span style="color: var(--text-dim); font-size: 0.75rem;">${jitterStr}</span></td>
                     <td>
                         <span style="color: #22d3ee; font-weight: 600;">${dlAvg}</span>${dlMbs}
-                        <div style="font-size: 0.72rem; color: var(--text-dim);">Máx: ${dlMax}</div>
+                        <div style="font-size: 0.72rem; color: var(--text-dim);">${t("st_max", "Máx:")} ${dlMax}</div>
                     </td>
                     <td>
                         <span style="color: #c084fc; font-weight: 600;">${ulAvg}</span>${ulMbs}
-                        <div style="font-size: 0.72rem; color: var(--text-dim);">Máx: ${ulMax}</div>
+                        <div style="font-size: 0.72rem; color: var(--text-dim);">${t("st_max", "Máx:")} ${ulMax}</div>
                     </td>
                     <td>${roleBadge}</td>
                     <td style="text-align: right;">${deleteAction}</td>
@@ -928,7 +928,7 @@ async function loadSpeedtestResults() {
         }).join("");
     } catch (err) {
         console.error("Failed to load speedtest results:", err);
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--down-color);">Erro ao carregar resultados de velocidade</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--down-color);">${t("st_phase_error", "Erro ao carregar resultados de velocidade")}</td></tr>`;
     }
 }
 

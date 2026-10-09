@@ -32,30 +32,33 @@ function speedToGauge(mbps) {
     if (mbps <= 0) return { angle: -140, fraction: 0 };
     // Non-linear scale benchmarks:
     // 0 -> -140 deg (frac 0.0)
-    // 10 -> -90 deg (frac 0.18)
-    // 50 -> -40 deg (frac 0.36)
+    // 0 -> -130 deg (frac 0.00)
+    // 10 -> -91 deg (frac 0.15)
+    // 50 -> -49.4 deg (frac 0.31)
     // 100 -> 0 deg (frac 0.50)
-    // 250 -> +45 deg (frac 0.66)
-    // 500 -> +90 deg (frac 0.82)
-    // 1000 -> +140 deg (frac 1.0)
+    // 250 -> +46.8 deg (frac 0.68)
+    // 500 -> +88.4 deg (frac 0.84)
+    // 1000+ -> +130 deg (frac 1.0)
     let frac = 0;
-    if (mbps <= 10) {
-        frac = (mbps / 10) * 0.18;
+    if (mbps <= 0) {
+        frac = 0;
+    } else if (mbps <= 10) {
+        frac = (mbps / 10) * 0.15;
     } else if (mbps <= 50) {
-        frac = 0.18 + ((mbps - 10) / 40) * 0.18;
+        frac = 0.15 + ((mbps - 10) / 40) * 0.16;
     } else if (mbps <= 100) {
-        frac = 0.36 + ((mbps - 50) / 50) * 0.14;
+        frac = 0.31 + ((mbps - 50) / 50) * 0.19;
     } else if (mbps <= 250) {
-        frac = 0.50 + ((mbps - 100) / 150) * 0.16;
+        frac = 0.50 + ((mbps - 100) / 150) * 0.18;
     } else if (mbps <= 500) {
-        frac = 0.66 + ((mbps - 250) / 250) * 0.16;
+        frac = 0.68 + ((mbps - 250) / 250) * 0.16;
     } else if (mbps <= 1000) {
-        frac = 0.82 + ((mbps - 500) / 500) * 0.18;
+        frac = 0.84 + ((mbps - 500) / 500) * 0.16;
     } else {
         frac = 1.0;
     }
     frac = Math.min(1.0, Math.max(0.0, frac));
-    const angle = -140 + frac * 280;
+    const angle = -130 + frac * 260;
     return { angle, fraction: frac };
 }
 
@@ -73,11 +76,10 @@ function updateGauge(mbps) {
 
     const { angle, fraction } = speedToGauge(safeMbps);
     if (needleEl) {
-        needleEl.setAttribute("transform", `rotate(${angle.toFixed(1)} 160 170)`);
+        needleEl.setAttribute("transform", `translate(180, 155) rotate(${angle.toFixed(1)})`);
     }
     if (arcEl) {
-        // Total dasharray ~ 586.4
-        const totalLen = 586.4;
+        const totalLen = 499.2;
         const offset = totalLen * (1 - fraction);
         arcEl.style.strokeDashoffset = offset.toFixed(1);
     }
@@ -423,21 +425,29 @@ async function startSpeedTest() {
         // Step 4: Submit Results to NetMap server
         setPhaseTitle(t("st_phase_saving", "Salvando resultados..."), false);
         try {
+            const pingVal = Number.isFinite(ping) ? parseFloat(ping.toFixed(1)) : 0.0;
+            const jitterVal = Number.isFinite(jitter) ? parseFloat(jitter.toFixed(1)) : 0.0;
+            const dlMaxVal = Number.isFinite(dlMax) ? parseFloat(dlMax.toFixed(2)) : 0.0;
+            const dlAvgVal = Number.isFinite(dlAvg) ? parseFloat(dlAvg.toFixed(2)) : 0.0;
+            const ulMaxVal = Number.isFinite(ulMax) ? parseFloat(ulMax.toFixed(2)) : 0.0;
+            const ulAvgVal = Number.isFinite(ulAvg) ? parseFloat(ulAvg.toFixed(2)) : 0.0;
+
             const saveResp = await fetch(`${APP_BASE}/api/speedtest/results`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    ping_ms: parseFloat(ping.toFixed(1)),
-                    jitter_ms: parseFloat(jitter.toFixed(1)),
-                    download_max_mbps: parseFloat(dlMax.toFixed(2)),
-                    download_avg_mbps: parseFloat(dlAvg.toFixed(2)),
-                    upload_max_mbps: parseFloat(ulMax.toFixed(2)),
-                    upload_avg_mbps: parseFloat(ulAvg.toFixed(2))
+                    ping_ms: pingVal,
+                    jitter_ms: jitterVal,
+                    download_max_mbps: dlMaxVal,
+                    download_avg_mbps: dlAvgVal,
+                    upload_max_mbps: ulMaxVal,
+                    upload_avg_mbps: ulAvgVal
                 })
             });
 
             if (saveResp.ok) {
                 const resData = await saveResp.json();
+                console.log("Speedtest result saved successfully, ID:", resData.id);
                 if (resData.role === "visitor" && speedtestConfig.visitor_cooldown_hours > 0) {
                     speedtestConfig.cooldown_remaining_seconds = speedtestConfig.visitor_cooldown_hours * 3600;
                     speedtestConfig.can_test = false;
@@ -446,6 +456,9 @@ async function startSpeedTest() {
             } else if (saveResp.status === 429) {
                 const errData = await saveResp.json();
                 console.warn("Cooldown enforced on save:", errData);
+            } else {
+                const errTxt = await saveResp.text();
+                console.error("Failed to save speedtest results:", saveResp.status, errTxt);
             }
         } catch (saveErr) {
             console.error("Failed to persist speedtest results:", saveErr);
@@ -462,6 +475,15 @@ async function startSpeedTest() {
             btn.disabled = false;
         }
     }
+}
+
+function escapeHtml(text) {
+    if (!text) return "";
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }
 
 // Initial configuration loader
@@ -497,11 +519,19 @@ async function initSpeedtest() {
         const authResp = await fetch(`${APP_BASE}/api/auth/me`, { cache: "no-store" });
         const slot = document.getElementById("nav-auth-slot");
         if (authResp.ok && slot) {
-            const u = await authResp.json();
-            slot.innerHTML = `
-                <a href="${APP_BASE}/admin" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;">⚙️ Admin</a>
-                <span style="font-size: 0.8rem; color: var(--text-muted);">👤 ${u.username} (${u.role})</span>
-            `;
+            const authData = await authResp.json();
+            if (authData.authenticated && authData.user) {
+                const u = authData.user;
+                const roleLabel = u.role === "admin" ? "Admin" : (u.role === "operator" ? (currentLang === "en" ? "Operator" : "Operador") : u.role);
+                slot.innerHTML = `
+                    <a href="${APP_BASE}/admin" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;">⚙️ Admin</a>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px;">👤 <strong>${escapeHtml(u.username)}</strong> (${escapeHtml(roleLabel)})</span>
+                `;
+            } else {
+                slot.innerHTML = `
+                    <a href="${APP_BASE}/admin" class="btn btn-outline" style="padding: 4px 10px; font-size: 0.8rem;">🔐 Login</a>
+                `;
+            }
         }
     } catch (_) {}
 }
