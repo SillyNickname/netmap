@@ -86,6 +86,30 @@ async def init_databases() -> None:
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
         """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS speedtest_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_ip TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                ping_ms REAL,
+                jitter_ms REAL,
+                download_max_mbps REAL,
+                download_avg_mbps REAL,
+                upload_max_mbps REAL,
+                upload_avg_mbps REAL,
+                role TEXT NOT NULL DEFAULT 'visitor',
+                user_agent TEXT
+            );
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_speedtest_client_ip 
+            ON speedtest_results(client_ip, timestamp DESC);
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_speedtest_timestamp 
+            ON speedtest_results(timestamp DESC);
+        """)
         await db.commit()
 
         # Create default admin and operator if users table is empty

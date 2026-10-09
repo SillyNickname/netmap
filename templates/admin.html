@@ -119,6 +119,9 @@
                 <button id="lang-btn-en" class="lang-btn" onclick="setLanguage('en')">🇺🇸 EN</button>
             </div>
 
+            <a href="{{ base_path }}/speedtest" class="btn btn-outline" style="padding: 5px 12px; border-color: rgba(6,182,212,0.4); color: #22d3ee;" title="Speedtest">
+                <span>🚀</span> <span data-i18n="nav_speedtest">Speedtest</span>
+            </a>
             <a href="{{ base_path }}/" class="btn btn-outline" style="padding: 5px 12px;" data-i18n="back_to_tree">← Voltar ao Mapa</a>
             <span style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
                 👤 <span id="admin-user-display">Admin</span>
@@ -134,6 +137,7 @@
         <button class="admin-tab-btn" data-tab="tab-csv" data-i18n="tab_csv">📂 Importar / Exportar CSV</button>
         <button class="admin-tab-btn" data-tab="tab-settings" data-i18n="tab_settings">⚙️ Configurações (.cfg)</button>
         <button class="admin-tab-btn" data-tab="tab-users" data-i18n="tab_users">👤 Usuários</button>
+        <button class="admin-tab-btn" data-tab="tab-speedtest" data-i18n="tab_speedtest">🚀 Testes de Velocidade</button>
         <button class="admin-tab-btn" data-tab="tab-maintenance" data-i18n="tab_maintenance">🛠️ Manutenção</button>
     </nav>
 
@@ -395,7 +399,57 @@
             </div>
         </section>
 
-        <!-- TAB 6: MAINTENANCE -->
+        <!-- TAB 6: SPEEDTEST RESULTS -->
+        <section id="tab-speedtest" class="admin-tab-panel">
+            <div class="panel-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h2 style="font-size: 1.2rem; color: #fff;" data-i18n="st_admin_title">Histórico de Testes de Velocidade</h2>
+                        <p style="font-size: 0.82rem; color: var(--text-dim);" data-i18n="st_admin_desc">Consulte e pesquise os testes executados pelos usuários da rede por endereço IP.</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <input type="text" id="speedtest-search-ip" class="form-control" style="width: 220px; padding: 6px 12px; font-size: 0.85rem;" placeholder="Pesquisar por IP..." data-i18n-placeholder="st_search_ip_placeholder" onkeydown="if(event.key==='Enter') loadSpeedtestResults()">
+                        <button class="btn btn-primary" onclick="loadSpeedtestResults()" style="padding: 6px 14px;" data-i18n="st_filter_btn">Filtrar</button>
+                        <button class="btn btn-outline" onclick="clearSpeedtestFilter()" style="padding: 6px 12px;" data-i18n="st_clear_btn">Limpar</button>
+                        <button class="btn btn-outline" onclick="loadSpeedtestResults()" style="padding: 6px 12px;" data-i18n="st_refresh_btn">↻ Atualizar</button>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="th_st_ip">IP do Cliente</th>
+                                <th data-i18n="th_st_timestamp">Data / Hora</th>
+                                <th data-i18n="th_st_ping">Latência / Jitter</th>
+                                <th data-i18n="th_st_download">Download (Méd / Máx)</th>
+                                <th data-i18n="th_st_upload">Upload (Méd / Máx)</th>
+                                <th data-i18n="th_st_role">Tipo de Usuário</th>
+                                <th style="text-align: right;" data-i18n="th_st_actions">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="speedtest-results-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="speedtest-empty-msg" style="display: none; padding: 30px; text-align: center; color: var(--text-dim); font-size: 0.9rem;" data-i18n="st_no_results">
+                    Nenhum resultado de teste de velocidade encontrado.
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 0.85rem; color: var(--text-muted);">
+                    <div>Total: <strong id="speedtest-total-count">0</strong> testes registrados</div>
+                    <div id="speedtest-pagination" style="display: flex; gap: 8px;">
+                        <button id="speedtest-prev-btn" class="btn btn-outline" style="padding: 3px 10px; font-size: 0.8rem;" onclick="prevSpeedtestPage()" disabled>← Anterior</button>
+                        <span id="speedtest-page-info" style="align-self: center;">Página 1</span>
+                        <button id="speedtest-next-btn" class="btn btn-outline" style="padding: 3px 10px; font-size: 0.8rem;" onclick="nextSpeedtestPage()" disabled>Próxima →</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 7: MAINTENANCE -->
         <section id="tab-maintenance" class="admin-tab-panel">
             <div class="panel-card" style="max-width: 700px;">
                 <h2 style="font-size: 1.2rem; color: #fff; margin-bottom: 6px;" data-i18n="maint_title">Saúde dos Bancos de Dados & Armazenamento</h2>

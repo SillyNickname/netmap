@@ -144,6 +144,23 @@ location /netmap/ {
     proxy_connect_timeout 60s;
     proxy_read_timeout 120s;
 }
+
+# Bloco Opcional para Daemon Remoto de Speedtest:
+# Se você estiver executando o daemon de speedtest em um servidor remoto dedicado (ex: 192.168.10.50:8081):
+location /netmap/speedtest/target/ {
+    proxy_pass http://192.168.10.50:8081/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Essencial para medição precisa de taxa de transferência:
+    gzip off;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    client_max_body_size 100M;
+}
 ```
 
 > **Por que a barra final em `proxy_pass http://127.0.0.1:8080/;` é fundamental?**
@@ -219,6 +236,80 @@ WantedBy=multi-user.target
 sudo systemctl daemon-reload
 sudo systemctl enable --now netmap
 ```
+
+---
+
+## 🛰️ Daemon Autônomo de Teste de Velocidade / Standalone Speedtest Daemon
+
+O NetMap inclui um daemon assíncrono ultraleve (`netmap.speedtest_daemon`) que pode ser executado em um servidor remoto dedicado para medição de throughput (Download/Upload de 5 segundos e Latência/Jitter) sem compressão e sem overhead de banco de dados.
+
+### 1. Iniciar Manualmente no Servidor Remoto
+```bash
+# Execução direta com o launcher incluído:
+/opt/netmap/scripts/netmap-speedtest-daemon --host 0.0.0.0 --port 8081
+
+# Ou invocando diretamente o módulo Python:
+python3 -m netmap.speedtest_daemon --host 0.0.0.0 --port 8081
+```
+
+### 2. Configurar como Serviço `systemd` no Servidor Remoto
+Crie o arquivo `/etc/systemd/system/netmap-speedtest.service` no servidor remoto:
+```ini
+[Unit]
+Description=NetMap Speedtest Standalone Daemon
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/netmap
+ExecStart=/opt/netmap/.venv/bin/python3 -m netmap.speedtest_daemon --host 0.0.0.0 --port 8081
+Restart=always
+RestartSec=3s
+LimitNOFILE=65536
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=netmap-speedtest
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Ative e inicie o serviço no servidor remoto:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now netmap-speedtest
+sudo systemctl status netmap-speedtest
+```
+
+### 3. Configurar no Servidor Principal NetMap
+No servidor principal do NetMap onde está o Nginx:
+1. No arquivo `/etc/nginx/sites-available/...`, adicione o bloco de proxy apontando para o IP do servidor remoto:
+   ```nginx
+   location /netmap/speedtest/target/ {
+       proxy_pass http://<IP_DO_SERVIDOR_REMOTO>:8081/;
+       proxy_http_version 1.1;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       gzip off;
+       proxy_buffering off;
+       proxy_request_buffering off;
+       client_max_body_size 100M;
+   }
+   ```
+2. Recarregue o Nginx: `sudo nginx -t && sudo systemctl reload nginx`
+3. No arquivo `/opt/netmap/netmap.cfg` (ou na aba **Configurações / Settings** do painel de administração):
+   ```ini
+   [speedtest]
+   enabled = true
+   server_url = /netmap/speedtest/target
+   duration_seconds = 5
+   visitor_cooldown_hours = 2
+   ```
 
 ---
 

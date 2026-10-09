@@ -24,6 +24,8 @@ let hostSortAsc = localStorage.getItem("netmap_admin_host_sort_asc") !== "false"
 let groupSortColumn = localStorage.getItem("netmap_admin_group_sort_col") || "name";
 let groupSortAsc = localStorage.getItem("netmap_admin_group_sort_asc") !== "false";
 
+let currentUserRole = "visitor";
+
 document.addEventListener("DOMContentLoaded", () => {
     checkAdminAuth();
 });
@@ -32,13 +34,34 @@ async function checkAdminAuth() {
     try {
         const res = await fetch(`${APP_BASE}/api/auth/me`);
         const data = await res.json();
-        if (!data.authenticated || data.user.role !== "admin") {
+        if (!data.authenticated || (data.user.role !== "admin" && data.user.role !== "operator")) {
             window.location.href = `${APP_BASE}/?auth_required=true`;
             return;
         }
-        document.getElementById("admin-user-display").innerText = data.user.username;
+        currentUserRole = data.user.role;
+        document.getElementById("admin-user-display").innerText = `${data.user.username} (${data.user.role === 'admin' ? 'Admin' : 'Operador'})`;
         initAdminTabs();
-        loadAllData();
+
+        if (currentUserRole === "operator") {
+            // Operator / Technician role: hide admin-only tabs
+            document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+                const tab = btn.getAttribute("data-tab");
+                if (tab !== "tab-speedtest") {
+                    btn.style.display = "none";
+                }
+            });
+            // Activate speedtest tab directly
+            document.querySelectorAll(".admin-tab-btn").forEach(t => t.classList.remove("active"));
+            document.querySelectorAll(".admin-tab-panel").forEach(p => p.classList.remove("active"));
+            const stBtn = document.querySelector('[data-tab="tab-speedtest"]');
+            if (stBtn) stBtn.classList.add("active");
+            const stPanel = document.getElementById("tab-speedtest");
+            if (stPanel) stPanel.classList.add("active");
+            loadSpeedtestResults();
+        } else {
+            loadAllData();
+            loadSpeedtestResults();
+        }
     } catch (err) {
         console.error("Auth check failed:", err);
         window.location.href = `${APP_BASE}/`;
@@ -64,7 +87,12 @@ function initAdminTabs() {
             
             tab.classList.add("active");
             const target = tab.getAttribute("data-tab");
-            document.getElementById(target).classList.add("active");
+            const panel = document.getElementById(target);
+            if (panel) panel.classList.add("active");
+
+            if (target === "tab-speedtest") {
+                loadSpeedtestResults();
+            }
         });
     });
 }
@@ -806,3 +834,138 @@ function escapeHtml(text) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
+
+// ----------------- SPEEDTEST RESULTS MANAGEMENT -----------------
+
+let speedtestCurrentPage = 1;
+const speedtestPageSize = 25;
+let speedtestTotalCount = 0;
+
+async function loadSpeedtestResults() {
+    const tbody = document.getElementById("speedtest-results-tbody");
+    const emptyMsg = document.getElementById("speedtest-empty-msg");
+    const totalEl = document.getElementById("speedtest-total-count");
+    const pageInfo = document.getElementById("speedtest-page-info");
+    const prevBtn = document.getElementById("speedtest-prev-btn");
+    const nextBtn = document.getElementById("speedtest-next-btn");
+    const searchIpInput = document.getElementById("speedtest-search-ip");
+    const searchIp = searchIpInput ? searchIpInput.value.trim() : "";
+
+    if (!tbody) return;
+
+    try {
+        const offset = (speedtestCurrentPage - 1) * speedtestPageSize;
+        let url = `${APP_BASE}/api/speedtest/results?limit=${speedtestPageSize}&offset=${offset}`;
+        if (searchIp) {
+            url += `&search_ip=${encodeURIComponent(searchIp)}`;
+        }
+
+        const res = await fetch(url);
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--down-color);">Erro ao carregar dados</td></tr>`;
+            return;
+        }
+
+        const data = await res.json();
+        const results = data.results || [];
+        speedtestTotalCount = data.total || 0;
+
+        if (totalEl) totalEl.innerText = speedtestTotalCount.toLocaleString();
+
+        const totalPages = Math.max(1, Math.ceil(speedtestTotalCount / speedtestPageSize));
+        if (pageInfo) pageInfo.innerText = `Página ${speedtestCurrentPage} de ${totalPages}`;
+        if (prevBtn) prevBtn.disabled = speedtestCurrentPage <= 1;
+        if (nextBtn) nextBtn.disabled = speedtestCurrentPage >= totalPages;
+
+        if (results.length === 0) {
+            tbody.innerHTML = "";
+            if (emptyMsg) emptyMsg.style.display = "block";
+            return;
+        }
+
+        if (emptyMsg) emptyMsg.style.display = "none";
+        tbody.innerHTML = results.map(r => {
+            const dateStr = new Date(r.timestamp * 1000).toLocaleString();
+            const pingStr = r.ping_ms != null ? `${r.ping_ms.toFixed(1)} ms` : "--";
+            const jitterStr = r.jitter_ms != null ? ` (±${r.jitter_ms.toFixed(1)} ms)` : "";
+            
+            const dlAvg = r.download_avg_mbps != null ? `${r.download_avg_mbps.toFixed(2)} Mbps` : "--";
+            const dlMax = r.download_max_mbps != null ? `${r.download_max_mbps.toFixed(2)} Mbps` : "--";
+            const dlMbs = r.download_avg_mbps != null ? ` (${(r.download_avg_mbps / 8).toFixed(2)} MB/s)` : "";
+
+            const ulAvg = r.upload_avg_mbps != null ? `${r.upload_avg_mbps.toFixed(2)} Mbps` : "--";
+            const ulMax = r.upload_max_mbps != null ? `${r.upload_max_mbps.toFixed(2)} Mbps` : "--";
+            const ulMbs = r.upload_avg_mbps != null ? ` (${(r.upload_avg_mbps / 8).toFixed(2)} MB/s)` : "";
+
+            let roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(148,163,184,0.15); color: #94a3b8;">Visitante</span>`;
+            if (r.role === "admin") {
+                roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(168,85,247,0.2); color: #c084fc; font-weight:600;">Admin</span>`;
+            } else if (r.role === "operator") {
+                roleBadge = `<span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: rgba(59,130,246,0.2); color: #60a5fa; font-weight:600;">Operador</span>`;
+            }
+
+            const deleteAction = currentUserRole === "admin"
+                ? `<button onclick="deleteSpeedtestItem(${r.id})" class="btn btn-outline" style="padding: 2px 8px; font-size: 0.75rem; color: var(--down-color);" title="Excluir">🗑️</button>`
+                : `<span style="color: var(--text-dim); font-size: 0.75rem;">—</span>`;
+
+            return `
+                <tr>
+                    <td><strong style="color: #fff; font-family: monospace;">${escapeHtml(r.client_ip)}</strong></td>
+                    <td style="color: var(--text-muted); font-size: 0.82rem;">${dateStr}</td>
+                    <td><span style="color: var(--up-color); font-weight: 600;">${pingStr}</span><span style="color: var(--text-dim); font-size: 0.75rem;">${jitterStr}</span></td>
+                    <td>
+                        <span style="color: #22d3ee; font-weight: 600;">${dlAvg}</span>${dlMbs}
+                        <div style="font-size: 0.72rem; color: var(--text-dim);">Máx: ${dlMax}</div>
+                    </td>
+                    <td>
+                        <span style="color: #c084fc; font-weight: 600;">${ulAvg}</span>${ulMbs}
+                        <div style="font-size: 0.72rem; color: var(--text-dim);">Máx: ${ulMax}</div>
+                    </td>
+                    <td>${roleBadge}</td>
+                    <td style="text-align: right;">${deleteAction}</td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        console.error("Failed to load speedtest results:", err);
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--down-color);">Erro ao carregar resultados de velocidade</td></tr>`;
+    }
+}
+
+function clearSpeedtestFilter() {
+    const input = document.getElementById("speedtest-search-ip");
+    if (input) input.value = "";
+    speedtestCurrentPage = 1;
+    loadSpeedtestResults();
+}
+
+function prevSpeedtestPage() {
+    if (speedtestCurrentPage > 1) {
+        speedtestCurrentPage--;
+        loadSpeedtestResults();
+    }
+}
+
+function nextSpeedtestPage() {
+    const totalPages = Math.max(1, Math.ceil(speedtestTotalCount / speedtestPageSize));
+    if (speedtestCurrentPage < totalPages) {
+        speedtestCurrentPage++;
+        loadSpeedtestResults();
+    }
+}
+
+async function deleteSpeedtestItem(id) {
+    if (!confirm("Tem certeza que deseja excluir este registro de teste de velocidade?")) return;
+    try {
+        const res = await fetch(`${APP_BASE}/api/speedtest/results/${id}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast("Registro excluído com sucesso", "success");
+            loadSpeedtestResults();
+        } else {
+            showToast("Falha ao excluir registro", "error");
+        }
+    } catch (err) {
+        showToast("Erro ao excluir registro", "error");
+    }
+}
+

@@ -1,0 +1,183 @@
+<!--
+  NetMap - Network Tree Status Monitor (Speedtest Interface)
+  Developed by: Antigravity (Google DeepMind)
+  Requested and commissioned by: Andre Kajita <kajita@univap.br>
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetMap - Teste de Velocidade / Speedtest</title>
+    <link rel="stylesheet" href="{{ base_path }}/static/css/speedtest.css?v=1.1.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <script>
+        window.NETMAP_BASE = "{{ base_path }}";
+    </script>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="speedtest-navbar">
+        <a href="{{ base_path }}/" class="brand">
+            <div class="brand-icon">🌐</div>
+            <span>NetMap</span>
+            <span style="font-size: 0.75rem; background: rgba(6,182,212,0.2); color: #22d3ee; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Speedtest</span>
+        </a>
+
+        <div class="nav-right">
+            <!-- Language Switcher -->
+            <div class="lang-switcher" style="display: flex; gap: 4px;">
+                <button id="lang-btn-pt" class="lang-btn active" onclick="setLanguage('pt-BR')">🇧🇷 PT</button>
+                <button id="lang-btn-en" class="lang-btn" onclick="setLanguage('en')">🇺🇸 EN</button>
+            </div>
+
+            <a href="{{ base_path }}/" class="btn btn-outline" data-i18n="back_to_tree">← Mapa de Rede</a>
+            <div id="nav-auth-slot" style="display: flex; align-items: center; gap: 8px;">
+                <!-- Populated dynamically by speedtest.js -->
+            </div>
+        </div>
+    </header>
+
+    <main class="speedtest-container">
+        <!-- Cooldown Banner -->
+        <div id="cooldown-banner" class="cooldown-banner">
+            <span style="font-size: 1.4rem;">⏳</span>
+            <div>
+                <div style="font-weight: 700; color: #fff;" data-i18n="st_cooldown_title">Intervalo de Espera Ativo para Visitantes</div>
+                <div style="font-size: 0.82rem; margin-top: 2px;">
+                    <span data-i18n="st_cooldown_desc">Visitantes podem realizar um teste a cada 2 horas. Próximo teste em:</span>
+                    <span id="cooldown-timer" class="cooldown-clock">00:00:00</span>.
+                    <span style="color: var(--text-dim);" data-i18n="st_cooldown_auth_hint">(Operadores e Administradores podem entrar para testar sem intervalo).</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <!-- Server target badge -->
+            <div class="server-badge">
+                <span>🎯</span>
+                <span data-i18n="st_server_target">Servidor de Teste:</span>
+                <strong id="server-target-display">NetMap Local Engine</strong>
+                <span id="client-ip-badge" style="color: var(--text-dim); margin-left: 6px;">(IP: ...)</span>
+            </div>
+
+            <!-- Current phase message -->
+            <div id="phase-title" class="phase-title">
+                <span data-i18n="st_ready_msg">Pronto para iniciar o teste de velocidade</span>
+            </div>
+
+            <!-- Gauge -->
+            <div class="gauge-wrapper">
+                <svg class="gauge-svg" viewBox="0 0 320 220">
+                    <defs>
+                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#06b6d4" />
+                            <stop offset="50%" stop-color="#3b82f6" />
+                            <stop offset="100%" stop-color="#a855f7" />
+                        </linearGradient>
+                    </defs>
+                    <!-- Background Arc: radius=120, center=(160, 170), from -140 deg to +140 deg -->
+                    <!-- Path length ~ 586.4 -->
+                    <path class="gauge-bg-arc" d="M 68.08 92.86 A 120 120 0 1 1 251.92 92.86" />
+                    <!-- Value Arc -->
+                    <path id="gauge-val-arc" class="gauge-val-arc" d="M 68.08 92.86 A 120 120 0 1 1 251.92 92.86" 
+                          stroke-dasharray="586.4" stroke-dashoffset="586.4" />
+                    <!-- Needle -->
+                    <g id="gauge-needle" class="gauge-needle" transform="rotate(-140 160 170)">
+                        <polygon points="156,170 164,170 161,48 159,48" fill="#ffffff" opacity="0.9" />
+                        <circle cx="160" cy="170" r="10" class="gauge-center-cap" />
+                        <circle cx="160" cy="170" r="4" fill="#0b0f19" />
+                    </g>
+                    <!-- Scale ticks labels -->
+                    <text x="60" y="115" font-size="11" fill="#5c6c84" font-weight="600">0</text>
+                    <text x="75" y="60" font-size="11" fill="#5c6c84" font-weight="600">10</text>
+                    <text x="120" y="32" font-size="11" fill="#5c6c84" font-weight="600">50</text>
+                    <text x="160" y="24" font-size="11" fill="#5c6c84" font-weight="600" text-anchor="middle">100</text>
+                    <text x="200" y="32" font-size="11" fill="#5c6c84" font-weight="600">250</text>
+                    <text x="245" y="60" font-size="11" fill="#5c6c84" font-weight="600">500</text>
+                    <text x="260" y="115" font-size="11" fill="#5c6c84" font-weight="600">1000+</text>
+                </svg>
+            </div>
+
+            <!-- Digital Speed Readout -->
+            <div class="readout-container">
+                <div class="speed-primary">
+                    <span id="speed-val-mbps">0.00</span>
+                    <span class="speed-unit">Mbps</span>
+                </div>
+                <div class="speed-secondary">
+                    <span id="speed-val-mbs">0.00</span> <strong>MB/s</strong>
+                </div>
+            </div>
+
+            <!-- Real-time Bar Chart -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <span data-i18n="st_realtime_history">Histórico do Teste em Tempo Real</span>
+                    <span id="chart-phase-indicator">--</span>
+                </div>
+                <div id="bar-chart" class="bar-chart">
+                    <!-- Bars inserted dynamically -->
+                </div>
+            </div>
+
+            <!-- Metrics Summary Grid -->
+            <div class="metrics-grid">
+                <!-- Box 1: Latency / Jitter -->
+                <div class="metric-box">
+                    <div class="metric-label">
+                        <span>⚡</span> <span data-i18n="st_metric_latency">Latência & Jitter</span>
+                    </div>
+                    <div class="metric-val-main">
+                        <span id="metric-ping">--</span> <span style="font-size: 0.9rem; color: var(--text-muted);">ms</span>
+                    </div>
+                    <div class="metric-subval">
+                        <span data-i18n="st_metric_jitter">Jitter:</span> <span id="metric-jitter">--</span> ms
+                    </div>
+                </div>
+
+                <!-- Box 2: Download -->
+                <div class="metric-box">
+                    <div class="metric-label" style="color: var(--cyan-color);">
+                        <span>⬇️</span> <span data-i18n="st_metric_download">Download</span>
+                    </div>
+                    <div class="metric-val-main">
+                        <span id="metric-dl-avg">--</span> <span style="font-size: 0.9rem; color: var(--text-muted);">Mbps</span>
+                    </div>
+                    <div class="metric-subval">
+                        <span data-i18n="st_max">Máx:</span> <strong id="metric-dl-max">--</strong> Mbps 
+                        (<span id="metric-dl-mbs">--</span> MB/s)
+                    </div>
+                </div>
+
+                <!-- Box 3: Upload -->
+                <div class="metric-box">
+                    <div class="metric-label" style="color: var(--purple-color);">
+                        <span>⬆️</span> <span data-i18n="st_metric_upload">Upload</span>
+                    </div>
+                    <div class="metric-val-main">
+                        <span id="metric-ul-avg">--</span> <span style="font-size: 0.9rem; color: var(--text-muted);">Mbps</span>
+                    </div>
+                    <div class="metric-subval">
+                        <span data-i18n="st_max">Máx:</span> <strong id="metric-ul-max">--</strong> Mbps 
+                        (<span id="metric-ul-mbs">--</span> MB/s)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <button id="btn-start-test" class="start-btn" onclick="startSpeedTest()">
+                <span data-i18n="st_btn_start">🚀 Iniciar Teste de Velocidade</span>
+            </button>
+        </div>
+    </main>
+
+    <footer class="speedtest-footer">
+        <p>NetMap &bull; Network Tree Status Monitor &bull; Developed by Antigravity (Google DeepMind) &bull; Commissioned by Andre Kajita (UNIVAP)</p>
+    </footer>
+
+    <script src="{{ base_path }}/static/js/i18n.js?v=1.3.0"></script>
+    <script src="{{ base_path }}/static/js/speedtest.js?v=1.1.0"></script>
+</body>
+</html>

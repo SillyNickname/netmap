@@ -41,6 +41,12 @@ class Config:
         self._parser["history"] = {
             "retention_hours": "48"
         }
+        self._parser["speedtest"] = {
+            "enabled": "true",
+            "server_url": "",
+            "duration_seconds": "5",
+            "visitor_cooldown_hours": "2"
+        }
         self._parser["database"] = {
             "hosts_db": "data/hosts.db",
             "history_db": "data/history.db"
@@ -51,6 +57,7 @@ class Config:
             "server": {"host": "0.0.0.0", "port": "8080", "secret_key": "netmap-secret-key-change-in-production", "url_prefix": ""},
             "poller": {"interval_seconds": "60", "ping_threads": "20", "ping_timeout": "2", "ping_count": "1"},
             "history": {"retention_hours": "48"},
+            "speedtest": {"enabled": "true", "server_url": "", "duration_seconds": "5", "visitor_cooldown_hours": "2"},
             "database": {"hosts_db": "data/hosts.db", "history_db": "data/history.db"}
         }
         changed = False
@@ -120,6 +127,23 @@ class Config:
     def history_db_path(self) -> str:
         return self._parser.get("database", "history_db", fallback="data/history.db")
 
+    # Speedtest settings
+    @property
+    def speedtest_enabled(self) -> bool:
+        return self._parser.getboolean("speedtest", "enabled", fallback=True)
+
+    @property
+    def speedtest_server_url(self) -> str:
+        return self._parser.get("speedtest", "server_url", fallback="").strip()
+
+    @property
+    def speedtest_duration_seconds(self) -> int:
+        return self._parser.getint("speedtest", "duration_seconds", fallback=5)
+
+    @property
+    def speedtest_visitor_cooldown_hours(self) -> int:
+        return self._parser.getint("speedtest", "visitor_cooldown_hours", fallback=2)
+
     def update_settings(self, updates: Dict[str, Any]) -> None:
         """Update settings and persist to netmap.cfg"""
         if "server_host" in updates:
@@ -146,6 +170,20 @@ class Config:
         if "retention_hours" in updates:
             val = max(24, int(updates["retention_hours"]))
             self._parser.set("history", "retention_hours", str(val))
+        if "speedtest_enabled" in updates:
+            enabled_val = updates["speedtest_enabled"]
+            if isinstance(enabled_val, bool):
+                self._parser.set("speedtest", "enabled", "true" if enabled_val else "false")
+            else:
+                self._parser.set("speedtest", "enabled", "true" if str(enabled_val).lower() in ("true", "1", "yes") else "false")
+        if "speedtest_server_url" in updates:
+            self._parser.set("speedtest", "server_url", str(updates["speedtest_server_url"]).strip())
+        if "speedtest_duration_seconds" in updates:
+            dur = max(3, min(30, int(updates["speedtest_duration_seconds"])))
+            self._parser.set("speedtest", "duration_seconds", str(dur))
+        if "speedtest_visitor_cooldown_hours" in updates:
+            cooldown = max(0, min(72, int(updates["speedtest_visitor_cooldown_hours"])))
+            self._parser.set("speedtest", "visitor_cooldown_hours", str(cooldown))
         self.save()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -158,6 +196,10 @@ class Config:
             "ping_timeout": self.ping_timeout,
             "ping_count": self.ping_count,
             "retention_hours": self.retention_hours,
+            "speedtest_enabled": self.speedtest_enabled,
+            "speedtest_server_url": self.speedtest_server_url,
+            "speedtest_duration_seconds": self.speedtest_duration_seconds,
+            "speedtest_visitor_cooldown_hours": self.speedtest_visitor_cooldown_hours,
             "hosts_db_path": self.hosts_db_path,
             "history_db_path": self.history_db_path
         }
